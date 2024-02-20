@@ -1,6 +1,9 @@
 ## CCD Package for [BEAST 2](beast2.org/)
 
-Allows TreeAnnotator to produce summary trees more sensible than via MCC trees.
+Implementation of the conditional clade distribution (CCD) with two parametrisations,
+namely, based on clade split frequencies (CCD1) and clade frequencies (CCD0).
+Furthermore, point estimators based on the CCDs are implemented,
+which allows TreeAnnotator to produce better summary trees than via MCC trees (which is restricted to the sample).
 
 ## Install 
 
