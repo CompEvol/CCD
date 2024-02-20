@@ -20,3 +20,26 @@ Allows TreeAnnotator to produce summary trees more sensible than via MCC trees.
   * git clone https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.1.zip
 * Run `ant install` from the CCD directory
   
+## Usage
+
+Start TreeAnnotator, and select `Conditional Clade Distribtion0` from the drop down box next to `Target tree type`:
+
+![tree annotator](doc/treeannotator.png)
+
+For CCD1, select `Conditional Clade Distribtion`.
+
+
+From a terminal, to use CCD0 for Linux and OS X run
+
+```
+/path/to/beast/bin/treeannotator -topology CCD0 input.trees output.tree
+```
+
+where `/path/to` the path to where BEAST is installed. For Windows, use
+
+```
+\path\to\BEAST\bat\treeannotator.bat -topology CCD0 input.trees output.tree
+```
+
+To use CCD1, replace `CCD0` with `CCD`.
+
