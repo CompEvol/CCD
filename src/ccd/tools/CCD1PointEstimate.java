@@ -9,23 +9,23 @@ import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 import beastfx.app.treeannotator.services.TopologySettingService;
-import ccd.model.CCD0;
+import ccd.model.CCD1;
 
 
-@Description("TreeAnnotator plugin for setting tree topology by maximum CCD0")
-public class PointEstimate implements TopologySettingService {
+@Description("TreeAnnotator plugin for setting tree topology by maximum CCD")
+public class CCD1PointEstimate implements TopologySettingService {
 
 	@Override
 	public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
 			throws IOException {
 
-		progressStream.println("Maximum CCD0 Point Esitmate");
+		progressStream.println("Maximum CCD1 Point Esitmate");
 		progressStream.println("0              25             50             75            100");
 		progressStream.println("|--------------|--------------|--------------|--------------|");
 		
 		treeSet.reset();
 		Tree tree = treeSet.next();
-		CCD0 ccd = new CCD0(tree.getLeafNodeCount(),
+		CCD1 ccd = new CCD1(tree.getLeafNodeCount(),
 				false);
 
 		int k = treeSet.totalTrees - treeSet.burninCount;
@@ -65,12 +65,12 @@ public class PointEstimate implements TopologySettingService {
 
 	@Override
 	public String getServiceName() {
-		return "CCD0";
+		return "CCD1";
 	}
 
 	@Override
 	public String getDescription() {
-		return "Conditional Clade Distribution 0";
+		return "Conditional Clade Distribution 1";
 	}
 
 }

@@ -7,12 +7,14 @@ which allows TreeAnnotator to produce better summary trees than via MCC trees (w
 
 ## Install 
 
+This requires BEAST 2 v2.7.6 or later to be installed, available from [beast2.org](beast2.org/).
+
 * Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.1.zip)
 * Create CCD directory inside BEAST package directory
   * for Windows in Users\<YourName>\BEAST\2.X\VSS
   * for Mac in /Users/<YourName>\/Library/Application Support/BEAST/2.X/VSS
   * for Linux /home/<YourName>/.beast/2.X/VSS
-  Here <YourName> is the username you use, and in “2.X” the X refers to the major version of BEAST, so 2.X=2.1 for version 2.1.3.
+  Here <YourName> is the username you use, and in “2.X” the X refers to the major version of BEAST, so 2.X=2.7 for version 2.7.6.
 * Unzip the file `CCD.package.v0.0.1.zip` inside the CCD directory
 
 ## Build from code
@@ -25,7 +27,7 @@ which allows TreeAnnotator to produce better summary trees than via MCC trees (w
   
 ## Usage
 
-Start TreeAnnotator, and select `Conditional Clade Distribtion0` from the drop down box next to `Target tree type`:
+Start TreeAnnotator, and select `Conditional Clade Distribtion 0` from the drop down box next to `Target tree type`:
 
 ![tree annotator](doc/treeannotator.png)
 
@@ -42,4 +44,6 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 \path\to\BEAST\bat\treeannotator.bat -topology CCD0 input.trees output.tree
 ```
 
+
+For CCD1 based point estimates select `Conditional Clade Distribtion 1` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
 
