@@ -29,8 +29,6 @@ Start TreeAnnotator, and select `Conditional Clade Distribtion0` from the drop d
 
 ![tree annotator](doc/treeannotator.png)
 
-For CCD1, select `Conditional Clade Distribtion`.
-
 
 From a terminal, to use CCD0 for Linux and OS X run
 
@@ -44,5 +42,4 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 \path\to\BEAST\bat\treeannotator.bat -topology CCD0 input.trees output.tree
 ```
 
-To use CCD1, replace `CCD0` with `CCD`.
 
