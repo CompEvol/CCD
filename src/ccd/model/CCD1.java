@@ -139,7 +139,7 @@ public class CCD1 extends AbstractCCD {
 
 	@Override
 	public String toString() {
-		return "CCD0 " + super.toString();
+		return "CCD1 " + super.toString();
 	}
 
 	/**

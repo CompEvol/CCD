@@ -5,9 +5,30 @@ namely, based on clade split frequencies (CCD1) and clade frequencies (CCD0).
 Furthermore, point estimators based on the CCDs are implemented,
 which allows TreeAnnotator to produce better summary trees than via MCC trees (which is restricted to the sample).
 
-## Install 
 
-This requires BEAST 2 v2.7.6 or later to be installed, available from [beast2.org](beast2.org/).
+
+## Install through BEAUti
+
+# Installing the package
+
+CCD is a [BEAST2](http://beast2.org) package that requires BEAST 2 v2.7.6.
+If you have not already done so, you can get BEAST 2 from [here](http://beast2.org).
+
+To install CCD, it is easiest to start BEAUti (a program that is part of BEAST), and select the menu `File/Manage packages`. A package manager dialog pops up, that looks something like this:
+
+![Package Manager](https://github.com/rbouckaert/AlmostDistributions/raw/master/doc/package-manager.png)
+
+If the CCD package is listed, just click on it to select it, and hit the `Install/Upgrade` button.
+
+If the CCD package is not listed, you may need to add a package repository by clicking the `Package repositories` button. A window pops up where you can click `Add URL` and add `https://raw.githubusercontent.com/CompEvol/CBAN/master/packages-extra-2.7.xml` in the entry. After clicking OK, the dialog should look something like this:
+
+![Package Repositories](https://github.com/rbouckaert/CCD/raw/master/doc/package_repos.png)
+
+Click OK and now CCD should be listed in the package manager (as in the first dialog above). Select and click Install/Upgrade to install.
+
+
+
+## Install by hand
 
 * Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.1.zip)
 * Create CCD directory inside BEAST package directory

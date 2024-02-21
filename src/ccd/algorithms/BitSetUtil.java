@@ -21,8 +21,7 @@ public class BitSetUtil {
 	public static boolean contains(BitSet container, BitSet contained) {
 		BitSet copy = (BitSet) container.clone();
 		copy.and(contained);
-		copy.xor(contained);
-		return copy.isEmpty();
+		return copy.equals(contained);
 	}
 
 	/**

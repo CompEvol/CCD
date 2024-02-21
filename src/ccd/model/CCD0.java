@@ -300,7 +300,7 @@ public class CCD0 extends AbstractCCD {
 	/* -- OTHER METHODS -- */
 	@Override
 	public String toString() {
-		return "CCD1 " + super.toString();
+		return "CCD0 " + super.toString();
 	}
 
 }
