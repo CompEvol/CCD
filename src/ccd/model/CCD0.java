@@ -1,5 +1,6 @@
 package ccd.model;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,6 +117,12 @@ public class CCD0 extends AbstractCCD {
 		this.dirtyStructure = false;
 	}
 
+	
+	PrintStream progressStream = null;
+	public void setProgressStream(PrintStream progressStream) {
+		this.progressStream = progressStream;
+	}
+	
 	/*
 	 * Expand CCD graph with clade partitions where parent and children were
 	 * observed, but not that clade partition.
@@ -161,11 +168,21 @@ public class CCD0 extends AbstractCCD {
 		// 2. find missing clade partitions
 		// we go through clades in increasing size, then check for each clade of
 		// at most half potential parent's size, whether we can find a partner
+		if (progressStream != null) {
+			progressStream.println("Processing " + clades.length + " clades");
+		}
+		int percentageDone = 0;
 		for (int i = 0; i < clades.length; i++) {
+			if (progressStream != null) {
+				while ((62*i) /clades.length > percentageDone) {
+					progressStream.print("*");
+					percentageDone++;
+				}
+			}
 			Clade parent = clades[i];
 
 			// we skip leaves and cherries as they have no/only one partition
-			if (parent.isLeaf() || parent.isCherry()) {
+			if (parent == null || parent.isLeaf() || parent.isCherry()) {
 				continue;
 			}
 
@@ -191,8 +208,22 @@ public class CCD0 extends AbstractCCD {
 					}
 				}
 			}
+			System.err.print(parent.getProbability());
+			if (parent.getProbability() == 1.0) {
+				// remove all sub-clades, since they cannot be combine with any other clade any more
+				for (int j = 0; j < i; j++) {
+					if (clades[j] != null && parent.contains(clades[j].getCladeInBits())) {
+						clades[j] = null;
+						System.err.print("x");
+					}
+				}				
+			}
 		}
 
+		if (progressStream != null) {
+			progressStream.println();
+			progressStream.println();
+		}
 		/*-double[] avgExpandedClades = new double[n];
 		int i = 0;
 		System.out.println("k, #c, avg1, #exp, avgNew, ratio");
