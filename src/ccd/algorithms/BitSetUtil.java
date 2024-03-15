@@ -1,6 +1,7 @@
 package ccd.algorithms;
 
-import java.util.BitSet;
+//import java.util.BitSet;
+import ccd.model.BitSet;
 
 /**
  * This class provides methods to work with BitSets.
@@ -87,5 +88,32 @@ public class BitSetUtil {
 		System.out.println("d:  " + disjoint(first, second));
 		System.out.println("c:  " + contains(first, second));
 		System.out.println("c-: " + contains(second, first));
+	}
+
+	public static BitSet getLexicographicFirst(BitSet bitsOne, BitSet bitsTwo) {
+		if (bitsOne.equals(bitsTwo)) {
+			// if they are equal, then we can return either bitset
+			return bitsOne;
+		}
+
+		// mask1 will contain all bits (taxa) that are in bitsTwo, but not in bitsOne
+		BitSet mask1 = new BitSet();
+		mask1.or(bitsOne);
+		mask1.andNot(bitsTwo);
+		mask1.or(bitsTwo);
+		mask1.andNot(bitsOne);
+
+		// mask2 will contain all bits (taxa) that are in bitsOne, but not in bitsTwo
+		BitSet mask2 = new BitSet();
+		mask2.or(bitsTwo);
+		mask2.andNot(bitsOne);
+		mask2.or(bitsOne);
+		mask2.andNot(bitsTwo);
+
+		// to know which clade is lexico smaller, we only have to compare
+		// the position of the first set bits in the masks
+		int firstDifferentBitInTwo = mask1.nextSetBit(0);
+		int firstDifferentBitInOne = mask2.nextSetBit(0);
+		return (firstDifferentBitInOne < firstDifferentBitInTwo) ? bitsOne : bitsTwo;
 	}
 }

@@ -1,8 +1,10 @@
 package ccd.model;
 
+import ccd.algorithms.BitSetUtil;
+
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.BitSet;
+//import java.util.BitSet;
 
 /**
  * <p>
@@ -276,6 +278,9 @@ public class CladePartition {
 		if (ccpSet) {
 			return ccp;
 		} else {
+			if (this.getParentClade().getNumberOfOccurrences() == 0) {
+				throw new AssertionError("Clade with zero occurrences detected - tidy up?");
+			}
 			return this.numOccurrences / ((double) this.getParentClade().getNumberOfOccurrences());
 		}
 		// if (this.ccp < 0) {
@@ -339,6 +344,9 @@ public class CladePartition {
 	 *            conditional clade probability (ccp) of this partition
 	 */
 	public void setCCP(double ccp) {
+		if (Double.isNaN(ccp)) {
+			throw new IllegalArgumentException("CCP value cannot be NaN");
+		}
 		this.ccp = ccp;
 		this.ccpSet = true;
 	}
@@ -379,4 +387,21 @@ public class CladePartition {
 		return maxSubtreeSumCladeCredibility;
 	}
 
+	public Clade getSmallerChild() {
+		Clade childOne = this.getChildClades()[0];
+		Clade childTwo = this.getChildClades()[1];
+		Clade smallClade = null;
+		if (childOne.size() < childTwo.size()) {
+			smallClade = childOne;
+		} else if (childOne.size() > childTwo.size()) {
+			smallClade = childTwo;
+		} else {
+			BitSet bitsOne = childOne.getCladeInBits();
+			BitSet bitsTwo = childTwo.getCladeInBits();
+			BitSet bitsSmaller = BitSetUtil.getLexicographicFirst(bitsOne, bitsTwo);
+			smallClade = (bitsSmaller == bitsOne) ? childOne : childTwo;
+		}
+
+		return smallClade;
+	}
 }

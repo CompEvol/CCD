@@ -44,8 +44,6 @@ public class PointEstimate implements TopologySettingService {
 			i++;
 		}
 		progressStream.println();
-		ccd.setAsDirty();
-		ccd.computeCladeProbabilities();
 
 		Tree maxCCDTree = ccd.getMAPTree();
 		// set non-zero branch lenghts

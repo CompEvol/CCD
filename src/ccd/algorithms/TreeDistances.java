@@ -2,11 +2,13 @@ package ccd.algorithms;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
+//import java.util.BitSet;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 
 import ccd.model.WrappedBeastTree;
+import ccd.model.BitSet;
+
 
 public class TreeDistances {
 
