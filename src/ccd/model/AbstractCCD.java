@@ -170,7 +170,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     private void initializeRootClade(int numLeaves) {
         this.numLeaves = numLeaves;
 
-        BitSet rootBitSet = new BitSet(numLeaves);
+        BitSet rootBitSet = BitSet.newBitSet(numLeaves);
         rootBitSet.set(0, numLeaves);
 
         this.rootClade = new Clade(rootBitSet, this);
@@ -200,7 +200,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /* Recursive helper method */
     private Clade addClade(Node vertex) {
-        BitSet cladeInBits = new BitSet(numLeaves);
+        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
         Clade firstChildClade = null;
         Clade secondChildClade = null;
 
@@ -264,7 +264,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /* Recursive helper method */
     private Clade reduceCladeCount(Node vertex) {
         // 1. build BitSet to retrieve clade and call recursion
-        BitSet cladeInBits = new BitSet(numLeaves);
+        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
         Clade firstChildClade = null;
         Clade secondChildClade = null;
 
@@ -801,7 +801,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /* Recursive helper method */
     private Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability) {
-        BitSet cladeInBits = new BitSet(numLeaves);
+        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
 
         if (vertex.isLeaf()) {
             int index = vertex.getNr();

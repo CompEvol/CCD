@@ -20,9 +20,10 @@ public class BitSetUtil {
 	 * @return whether the container BitSet contains the other BitSet
 	 */
 	public static boolean contains(BitSet container, BitSet contained) {
-		BitSet copy = (BitSet) container.clone();
-		copy.and(contained);
-		return copy.equals(contained);
+		return container.contains(contained);
+//		BitSet copy = (BitSet) container.clone();
+//		copy.and(contained);
+//		return copy.equals(contained);
 	}
 
 	/**
@@ -35,9 +36,10 @@ public class BitSetUtil {
 	 * @return whether the two given BitSets are disjoint.
 	 */
 	public static boolean disjoint(BitSet first, BitSet second) {
-		BitSet copy = (BitSet) first.clone();
-		copy.and(second);
-		return copy.isEmpty();
+		return first.disjoint(second);
+//		BitSet copy = (BitSet) first.clone();
+//		copy.and(second);
+//		return copy.isEmpty();
 	}
 
 	/**
@@ -63,8 +65,8 @@ public class BitSetUtil {
 	}
 
 	public static void main(String[] args) {
-		BitSet first = new BitSet(5);
-		BitSet second = new BitSet(5);
+		BitSet first = BitSet.newBitSet(5);
+		BitSet second = BitSet.newBitSet(5);
 		first.set(0);
 		first.set(1);
 		second.set(1);
@@ -97,15 +99,15 @@ public class BitSetUtil {
 		}
 
 		// mask1 will contain all bits (taxa) that are in bitsTwo, but not in bitsOne
-		BitSet mask1 = new BitSet();
-		mask1.or(bitsOne);
+		BitSet mask1 = BitSet.newBitSet(bitsOne);
+		//mask1.or(bitsOne);
 		mask1.andNot(bitsTwo);
 		mask1.or(bitsTwo);
 		mask1.andNot(bitsOne);
 
 		// mask2 will contain all bits (taxa) that are in bitsOne, but not in bitsTwo
-		BitSet mask2 = new BitSet();
-		mask2.or(bitsTwo);
+		BitSet mask2 = BitSet.newBitSet(bitsTwo);
+		//mask2.or(bitsTwo);
 		mask2.andNot(bitsOne);
 		mask2.or(bitsOne);
 		mask2.andNot(bitsTwo);

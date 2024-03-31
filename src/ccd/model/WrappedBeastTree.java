@@ -31,7 +31,7 @@ public class WrappedBeastTree {
 	}
 
 	private BitSet initCladeBitSet(Node vertex) {
-		BitSet cladeAsBitSet = new BitSet(wrappedTree.getLeafNodeCount());
+		BitSet cladeAsBitSet = BitSet.newBitSet(wrappedTree.getLeafNodeCount());
 		if (vertex.isLeaf()) {
 			cladeAsBitSet.set(vertex.getNr());
 		} else {

@@ -482,11 +482,19 @@ public class Clade {
      */
     public double getMaxSubtreeCCP() {
         if (this.maxSubtreeCCP < 0) {
+        	if (ties > 0) {
+        		ties = Integer.MIN_VALUE;
+        	}
             this.computeMaxSubtreeCCP();
+            if (ties > 0)
+            	System.out.println("Ties found for computeMaxSubtreeCCP.");
         }
 
         return maxSubtreeCCP;
     }
+    
+    private static int ties = 0;
+
 
     /**
      * Returns the partition of this clade that is realized in the max
@@ -497,7 +505,12 @@ public class Clade {
      */
     public CladePartition getMaxSubtreeCCPPartition() {
         if ((this.maxSubtreeCCPPartition == null) || (this.maxSubtreeCCP < 0)) {
+        	if (ties > 0) {
+        		ties = Integer.MIN_VALUE;
+        	}
             this.computeMaxSubtreeCCP();
+            if (ties > 0)
+            	System.out.println("Ties found for computeMaxSubtreeCCP.");
         }
 
         return maxSubtreeCCPPartition;
@@ -519,7 +532,8 @@ public class Clade {
                 maxSubtreeCCP = partitionMaxCCP;
                 maxSubtreeCCPPartition = partition;
             } else if (partitionMaxCCP == maxSubtreeCCP) {
-                System.out.println("Tie found for computeMaxSubtreeCCP.");
+            	ties++;
+                //System.out.println("Tie found for computeMaxSubtreeCCP.");
                 Clade smallCladeMax = maxSubtreeCCPPartition.getSmallerChild();
                 Clade smallCladeCurrent = partition.getSmallerChild();
 
@@ -545,7 +559,7 @@ public class Clade {
                 }
             }
         }
-
+        
         // TODO consider tie breaking mechanisms
     }
 

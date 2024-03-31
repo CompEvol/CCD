@@ -1,5 +1,6 @@
 package ccd.model;
 
+import beast.base.core.Log;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
@@ -134,6 +135,7 @@ public class CCD0 extends AbstractCCD {
      * observed, but not that clade partition.
      */
     private void expand() {
+    	long start = System.currentTimeMillis();
         // System.out.print("Expand ... ");
         int n = this.getNumberOfLeaves();
 
@@ -159,6 +161,9 @@ public class CCD0 extends AbstractCCD {
 //        		expand(clades0, n);
 //        	}
 //        }
+		
+    	long end = System.currentTimeMillis();
+    	Log.warning("expand in " + (end-start)/1000 + " seconds");
     }
         
     private void expand(Clade [] clades, int n) {
@@ -227,7 +232,7 @@ public class CCD0 extends AbstractCCD {
 		public void run() {
         	int i = start;
         	try {
-	            BitSet helperBits = new BitSet(clades[0].getCladeInBits().length());
+	            BitSet helperBits = BitSet.newBitSet(clades[0].getCladeInBits().size());
 	        	while (i < end) {
 	            	findPartitions(clades, cladeBuckets, helperBits, i);
 	        		i += threadCount;
@@ -268,7 +273,17 @@ public class CCD0 extends AbstractCCD {
 
             // remove clades below monophyletic clades
             if (parent.isMonophyletic()) {
-                Set<Clade> descendants = parent.getDescendantClades(true);
+            	Set<Clade> descendants;
+            	try {
+            		descendants = parent.getDescendantClades(true);
+            	} catch (ConcurrentModificationException e) {
+            		try {
+            			Thread.sleep(100);
+                		descendants = parent.getDescendantClades(true);
+            		} catch (Throwable e2) {
+                		descendants = new HashSet<>();
+            		}
+            	}
                 for (Clade descendant : descendants) {
                 	synchronized(this) {
                 		done.add(descendant);
@@ -279,7 +294,7 @@ public class CCD0 extends AbstractCCD {
     }
     
     private void findPartitions(Clade [] clades, List<Set<Clade>> cladeBuckets) {
-        BitSet helperBits = new BitSet(clades[0].getCladeInBits().length());
+        BitSet helperBits = BitSet.newBitSet(clades[0].getCladeInBits().size());
 
         // we go through clades in increasing size, then check for each clade of
         // at most half potential parent's size, whether we can find a partner
