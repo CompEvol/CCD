@@ -131,7 +131,7 @@ public class BitSet64 extends BitSet {
      * @see    #size()
      */
     public Object clone() {
-        BitSet64 result = (BitSet64) super.clone();
+        BitSet64 result = (BitSet64) new BitSet64();
         result.word1 = word1;
         return result;
     }

@@ -207,7 +207,7 @@ public class BitSet192 extends BitSet {
      * @see    #size()
      */
     public Object clone() {
-        BitSet192 result = (BitSet192) super.clone();
+        BitSet192 result = (BitSet192) new BitSet192();
         result.word1 = word1;
         result.word2 = word2;
         result.word3 = word3;

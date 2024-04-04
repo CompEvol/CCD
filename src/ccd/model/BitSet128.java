@@ -164,7 +164,7 @@ public class BitSet128 extends BitSet {
      * @see    #size()
      */
     public Object clone() {
-        BitSet128 result = (BitSet128) super.clone();
+        BitSet128 result = (BitSet128) new BitSet128();
         result.word1 = word1;
         result.word2 = word2;
         return result;

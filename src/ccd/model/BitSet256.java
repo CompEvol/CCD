@@ -258,7 +258,7 @@ public class BitSet256 extends BitSet {
      * @see    #size()
      */
     public Object clone() {
-        BitSet256 result = (BitSet256) super.clone();
+        BitSet256 result = (BitSet256) new BitSet256();
         result.word1 = word1;
         result.word2 = word2;
         result.word3 = word3;
