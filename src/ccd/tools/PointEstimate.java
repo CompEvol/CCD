@@ -2,6 +2,7 @@ package ccd.tools;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
 
 import beast.base.core.Description;
 import beast.base.core.Log;
@@ -28,6 +29,7 @@ public class PointEstimate implements TopologySettingService {
 		
 		treeSet.reset();
 		Tree tree = treeSet.next();
+		Tree firstTree = tree;
 		CCD0 ccd = new CCD0(tree.getLeafNodeCount(),
 				false);
 		ccd.setProgressStream(progressStream);
@@ -50,7 +52,25 @@ public class PointEstimate implements TopologySettingService {
 
 		Tree maxCCDTree = ccd.getMAPTree();
 		
-		sanityCheck(maxCCDTree, ccd);
+		
+		// sanity checks
+		try {
+			if (!sanityCheckPassed(maxCCDTree, ccd)) {
+				
+				// check if maxCCDTree equals the first tree
+				String newick1 = toSortedNewick(maxCCDTree.getRoot(), new int[1]);
+				String newick2 = toSortedNewick(firstTree.getRoot(), new int[1]);
+				if (newick1.equals(newick2)) {
+					Log.warning("The summary tree equals the first tree in the tree set!");
+					Log.warning("This strongly suggests burn-in was not removed, and the summary tree is not valid.");
+					Log.warning("Increase burn-in to get a more reasonable summary tree");
+				}
+			}
+		} catch (Throwable e) {
+			// we do not want sanity checks to ruin the job, 
+			// so report any issues but otherwise ignore it.
+			e.printStackTrace();
+		}
 		
 		// set non-zero branch lenghts
 		// otherwise all internal nodes are considered to be ancestral
@@ -68,8 +88,36 @@ public class PointEstimate implements TopologySettingService {
 		}
 		return maxCCDTree;
 	}
+	
+	
+	private String toSortedNewick(Node node, int[] maxNodeInClade) {
+        StringBuilder buf = new StringBuilder();
 
-	private void sanityCheck(Tree maxCCDTree, CCD0 ccd) {
+        if (!node.isLeaf()) {
+            buf.append("(");
+            String child1 = toSortedNewick(node.getChild(0), maxNodeInClade);
+            int child1Index = maxNodeInClade[0];
+            String child2 = toSortedNewick(node.getChild(1), maxNodeInClade);
+            int child2Index = maxNodeInClade[0];
+            if (child1Index > child2Index) {
+                buf.append(child2);
+                buf.append(",");
+                buf.append(child1);
+            } else {
+                buf.append(child1);
+                buf.append(",");
+                buf.append(child2);
+                maxNodeInClade[0] = child1Index;
+            }
+            buf.append(")");
+      } else {
+            maxNodeInClade[0] = node.getNr();
+            buf.append(node.getNr());
+        }
+        return buf.toString();
+    }
+
+	private boolean sanityCheckPassed(Tree maxCCDTree, CCD0 ccd) {
 		// Sanity check: if burn-in was not properly removed, the starting tree has a 
 		// good chance of becoming the MAP tree. To check this, we count how many of
 		// the clades in maxCCDTree only have a single observation in the tree set.
@@ -90,11 +138,14 @@ public class PointEstimate implements TopologySettingService {
 			Log.warning("This is likeley to happen when trees from burn-in ended up in the tree set.");
 			Log.warning("Make sure brun-in is removed properly.");
 			Log.warning("\nWARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING\n");
+			return false;
 		} else if (singletons >= 1) {
 			Log.warning("Note: there are " +singletons + " clades in the summary tree supported by a single tree only.");
 			Log.warning("The tree may not be well supported because there is a lot of topological uncertainty or ");
 			Log.warning("burn-in was not removed from the tree set properly.");
+			return false;
 		}
+		return true;
 	}
 
 	private BitSet traverse(Node node, int[] counts, CCD0 ccd) {
