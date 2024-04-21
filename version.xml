@@ -3,7 +3,7 @@
 	<depends on='BEAST.app' atleast='2.7.5'/>
 
     <service type="beastfx.app.treeannotator.services.TopologySettingService">
-        <provider classname="ccd.tools.PointEstimate"/>
+        <provider classname="ccd.tools.CCD0PointEstimate"/>
         <provider classname="ccd.tools.CCD1PointEstimate"/>
     </service>
 

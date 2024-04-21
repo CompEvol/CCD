@@ -10,25 +10,29 @@ import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 import beastfx.app.treeannotator.services.TopologySettingService;
-import ccd.model.CCD1;
+import ccd.model.AbstractCCD;
+import ccd.model.BitSet;
+import ccd.model.CCD0;
+import ccd.model.Clade;
 
 
-@Description("TreeAnnotator plugin for setting tree topology by maximum CCD")
-public class CCD1PointEstimate extends PointEstimate implements TopologySettingService {
+@Description("TreeAnnotator plugin for setting tree topology by maximum CCD0")
+public class CCD0PointEstimate extends PointEstimate implements TopologySettingService {
 
 	@Override
 	public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
 			throws IOException {
 
-		progressStream.println("Maximum CCD1 Point Esitmate");
+		progressStream.println("Maximum CCD0 Point Esitmate");
 		progressStream.println("0              25             50             75            100");
 		progressStream.println("|--------------|--------------|--------------|--------------|");
 		
 		treeSet.reset();
 		Tree tree = treeSet.next();
 		Tree firstTree = tree;
-		CCD1 ccd = new CCD1(tree.getLeafNodeCount(),
+		CCD0 ccd = new CCD0(tree.getLeafNodeCount(),
 				false);
+		ccd.setProgressStream(progressStream);
 
 		int k = treeSet.totalTrees - treeSet.burninCount;
 		int percentageDone = 0;
@@ -45,10 +49,11 @@ public class CCD1PointEstimate extends PointEstimate implements TopologySettingS
 			i++;
 		}
 		progressStream.println();
-		progressStream.println();
 
 		Tree maxCCDTree = ccd.getMAPTree();
 		
+		
+		// sanity checks
 		doSanityCheck(maxCCDTree, firstTree, ccd);
 		
 		// set non-zero branch lenghts
@@ -70,12 +75,12 @@ public class CCD1PointEstimate extends PointEstimate implements TopologySettingS
 
 	@Override
 	public String getServiceName() {
-		return "CCD1";
+		return "CCD0";
 	}
 
 	@Override
 	public String getDescription() {
-		return "Conditional Clade Distribution 1";
+		return "Conditional Clade Distribution 0";
 	}
 
 }

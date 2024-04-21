@@ -1,59 +1,16 @@
 package ccd.tools;
 
-import java.io.IOException;
-import java.io.PrintStream;
-import java.util.Arrays;
-
-import beast.base.core.Description;
 import beast.base.core.Log;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
-import beastfx.app.treeannotator.TreeAnnotator;
-import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
-import beastfx.app.treeannotator.services.TopologySettingService;
+import ccd.model.AbstractCCD;
 import ccd.model.BitSet;
-import ccd.model.CCD0;
 import ccd.model.Clade;
 
+/** base class for CCD0 and CCD1 point estimates, sharing sanity checks **/
+public class PointEstimate {
 
-@Description("TreeAnnotator plugin for setting tree topology by maximum CCD0")
-public class PointEstimate implements TopologySettingService {
-
-	@Override
-	public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
-			throws IOException {
-
-		progressStream.println("Maximum CCD0 Point Esitmate");
-		progressStream.println("0              25             50             75            100");
-		progressStream.println("|--------------|--------------|--------------|--------------|");
-		
-		treeSet.reset();
-		Tree tree = treeSet.next();
-		Tree firstTree = tree;
-		CCD0 ccd = new CCD0(tree.getLeafNodeCount(),
-				false);
-		ccd.setProgressStream(progressStream);
-
-		int k = treeSet.totalTrees - treeSet.burninCount;
-		int percentageDone = 0;
-		int i = 0;
-		while (tree != null) {
-			while ((62*i) /k > percentageDone) {
-				progressStream.print("*");
-				progressStream.flush();
-				percentageDone++;
-			}
-
-			ccd.addTree(tree);
-			tree = treeSet.hasNext() ? treeSet.next() : null;
-			i++;
-		}
-		progressStream.println();
-
-		Tree maxCCDTree = ccd.getMAPTree();
-		
-		
-		// sanity checks
+	protected Tree doSanityCheck(Tree maxCCDTree, Tree firstTree, AbstractCCD ccd) {
 		try {
 			if (!sanityCheckPassed(maxCCDTree, ccd)) {
 				
@@ -63,7 +20,11 @@ public class PointEstimate implements TopologySettingService {
 				if (newick1.equals(newick2)) {
 					Log.warning("The summary tree equals the first tree in the tree set!");
 					Log.warning("This strongly suggests burn-in was not removed, and the summary tree is not valid.");
-					Log.warning("Increase burn-in to get a more reasonable summary tree");
+
+				
+					Log.warning("The first tree is removed and the summary tree based on all following trees.");
+					ccd.removeTree(firstTree, true);
+					maxCCDTree = ccd.getMAPTree();
 				}
 			}
 		} catch (Throwable e) {
@@ -71,25 +32,10 @@ public class PointEstimate implements TopologySettingService {
 			// so report any issues but otherwise ignore it.
 			e.printStackTrace();
 		}
-		
-		// set non-zero branch lenghts
-		// otherwise all internal nodes are considered to be ancestral
-		// which messes up the height, length and posterior annotations
-		for (Node n : maxCCDTree.getRoot().getAllLeafNodes()) {
-			double h = 0;
-			do {
-				n.setHeight(h);
-				n = n.getParent();
-				if (n != null) {
-					h = Math.max(n.getLeft().getHeight() + 1, h);
-					h = Math.max(n.getRight().getHeight() + 1, h);
-				}
-			} while (n != null);
-		}
 		return maxCCDTree;
 	}
-	
-	
+
+
 	private String toSortedNewick(Node node, int[] maxNodeInClade) {
         StringBuilder buf = new StringBuilder();
 
@@ -117,7 +63,7 @@ public class PointEstimate implements TopologySettingService {
         return buf.toString();
     }
 
-	private boolean sanityCheckPassed(Tree maxCCDTree, CCD0 ccd) {
+	private boolean sanityCheckPassed(Tree maxCCDTree, AbstractCCD ccd) {
 		// Sanity check: if burn-in was not properly removed, the starting tree has a 
 		// good chance of becoming the MAP tree. To check this, we count how many of
 		// the clades in maxCCDTree only have a single observation in the tree set.
@@ -148,7 +94,7 @@ public class PointEstimate implements TopologySettingService {
 		return true;
 	}
 
-	private BitSet traverse(Node node, int[] counts, CCD0 ccd) {
+	private BitSet traverse(Node node, int[] counts, AbstractCCD ccd) {
 		if (node.isLeaf()) {
 			BitSet bitset = BitSet.newBitSet(ccd.getNumberOfLeaves());
 			bitset.set(node.getNr());
@@ -170,15 +116,4 @@ public class PointEstimate implements TopologySettingService {
 		}
 		
 	}
-
-	@Override
-	public String getServiceName() {
-		return "CCD0";
-	}
-
-	@Override
-	public String getDescription() {
-		return "Conditional Clade Distribution 0";
-	}
-
 }
