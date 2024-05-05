@@ -48,7 +48,7 @@ Click OK and now CCD should be listed in the package manager (as in the first di
   
 ## Usage
 
-Start TreeAnnotator, and select `Conditional Clade Distribtion 0` from the drop down box next to `Target tree type`:
+Start TreeAnnotator, and select `MAP (CCD0)` from the drop down box next to `Target tree type`:
 
 ![tree annotator](doc/treeannotator.png)
 
@@ -66,5 +66,5 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 ```
 
 
-For CCD1 based point estimates select `Conditional Clade Distribtion 1` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
+For CCD1 based point estimates select `MAP (CCD1)` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
 
