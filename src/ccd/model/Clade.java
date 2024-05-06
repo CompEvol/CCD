@@ -4,7 +4,6 @@ import ccd.algorithms.BitSetUtil;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-//import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -31,6 +30,11 @@ public class Clade {
      * implicit here, explicit in a global context.
      */
     private final BitSet cladeAsBitSet;
+
+    /**
+     * Number of taxa in this clade.
+     */
+    private final int size;
 
     /**
      * The number of times this clade occurs in the processed set of trees.
@@ -107,6 +111,7 @@ public class Clade {
      */
     private BigInteger numTopologies = null;
 
+
     /* -- CONSTRUCTORS & CONSTRUCTION METHODS -- */
 
     /**
@@ -119,11 +124,12 @@ public class Clade {
     public Clade(BitSet cladeInBits, AbstractCCD abstractCCD) {
         this.ccd = abstractCCD;
         this.cladeAsBitSet = cladeInBits;
+        this.size = cladeInBits.cardinality();
         this.parentClades = new ArrayList<Clade>(4);
         this.partitions = new ArrayList<CladePartition>(5);
         this.childClades = new ArrayList<Clade>(8);
 
-        if (cladeInBits.cardinality() == 1) {
+        if (size == 1) {
             this.maxSubtreeCCP = 1;
             this.maxSubtreeSumCladeCredibility = 1;
             this.probability = 1;
@@ -202,6 +208,17 @@ public class Clade {
         return newPartition;
     }
 
+    /** Removes the given partition from this clade. */
+    public void removePartition(CladePartition partition) {
+        if (this.partitions.remove(partition)) {
+            this.childClades.remove(partition.getChildClades()[0]);
+            partition.getChildClades()[0].parentClades.remove(this);
+            this.childClades.remove(partition.getChildClades()[1]);
+            partition.getChildClades()[1].parentClades.remove(this);
+        }
+    }
+
+
     /* -- STATE MANGEMENT -- */
 
     /**
@@ -227,6 +244,7 @@ public class Clade {
             }
         }
     }
+
 
     /* -- OCCURRENCE COUNTS & HEIGHTS -- */
 
@@ -301,17 +319,28 @@ public class Clade {
      */
     protected void decreaseOccurrenceCount(double height) {
         this.meanHeight = (meanHeight * numOccurrences - height) / (numOccurrences - 1);
+        // note that if no occurrences remain, then the height is set to NaN
 
         this.decreaseOccurrenceCount();
     }
 
-    /* -- GRAPH STUCTURE GETTERS & BASIC GETTERS -- */
+    /**
+     * Overwrites the registered number of occurrences with the given number.
+     *
+     * @param numOccurrences new value
+     */
+    public void setNumberOfOccurrences(int numOccurrences) {
+        this.numOccurrences = numOccurrences;
+    }
+
+
+    /* -- GRAPH STRUCTURE GETTERS & BASIC GETTERS -- */
 
     /**
      * @return number of taxa in this clade
      */
     public int size() {
-        return cladeAsBitSet.cardinality();
+        return this.size;
     }
 
     /**
@@ -325,14 +354,14 @@ public class Clade {
      * @return whether this clade represents a leaf
      */
     public boolean isLeaf() {
-        return (this.cladeAsBitSet.cardinality() == 1);
+        return (this.size == 1);
     }
 
     /**
      * @return whether this clade represents a cherry
      */
     public boolean isCherry() {
-        return (this.cladeAsBitSet.cardinality() == 2);
+        return (this.size == 2);
     }
 
     /**
@@ -351,8 +380,16 @@ public class Clade {
 
     @Override
     public String toString() {
-        return "Clade [cladeAsBitSet=" + cladeAsBitSet + ", numOccurrences=" + numOccurrences
-                + ", num partitions=" + partitions.size() + "]";
+        return "Clade [taxa = " + cladeAsBitSet + ", numOccurrences = " + numOccurrences
+                // + ", ccd = " + ccd
+                + ", num partitions = " + partitions.size() + "]";
+    }
+
+    /**
+     * @return the CCD this clade is part of
+     */
+    public AbstractCCD getCCD() {
+        return ccd;
     }
 
     /**
@@ -398,11 +435,32 @@ public class Clade {
     }
 
     /**
-     * @return the CCD this clade is part of
+     * Returns a set of all descendant clades (or up to monophyletic) of this clade.
+     *
+     * @param untilMonophyletics whether to not collect descendants of monophyletic descendant clades as well
+     * @return set of all descendant clades (or up to monophyletic) of this clade
      */
-    public AbstractCCD getCCD() {
-        return ccd;
+    public Set<Clade> getDescendantClades(boolean untilMonophyletics) {
+        Set<Clade> descendants = new HashSet<Clade>();
+
+        for (Clade child : this.getChildClades()) {
+            child.collectDescendantClades(untilMonophyletics, descendants);
+        }
+
+        return descendants;
     }
+
+    /* Recursive helper method */
+    private void collectDescendantClades(boolean untilMonophyletics, Set<Clade> descendants) {
+        if (descendants.add(this)) {
+            if (!untilMonophyletics || !this.isMonophyletic()) {
+                for (Clade child : this.getChildClades()) {
+                    child.collectDescendantClades(untilMonophyletics, descendants);
+                }
+            }
+        }
+    }
+
 
     /* -- GETTERS RECURSIVE VALUES -- */
 
@@ -482,19 +540,11 @@ public class Clade {
      */
     public double getMaxSubtreeCCP() {
         if (this.maxSubtreeCCP < 0) {
-        	if (ties > 0) {
-        		ties = Integer.MIN_VALUE;
-        	}
             this.computeMaxSubtreeCCP();
-            if (ties > 0)
-            	System.out.println("Ties found for computeMaxSubtreeCCP.");
         }
 
         return maxSubtreeCCP;
     }
-    
-    private static int ties = 0;
-
 
     /**
      * Returns the partition of this clade that is realized in the max
@@ -505,12 +555,7 @@ public class Clade {
      */
     public CladePartition getMaxSubtreeCCPPartition() {
         if ((this.maxSubtreeCCPPartition == null) || (this.maxSubtreeCCP < 0)) {
-        	if (ties > 0) {
-        		ties = Integer.MIN_VALUE;
-        	}
             this.computeMaxSubtreeCCP();
-            if (ties > 0)
-            	System.out.println("Ties found for computeMaxSubtreeCCP.");
         }
 
         return maxSubtreeCCPPartition;
@@ -532,8 +577,7 @@ public class Clade {
                 maxSubtreeCCP = partitionMaxCCP;
                 maxSubtreeCCPPartition = partition;
             } else if (partitionMaxCCP == maxSubtreeCCP) {
-            	ties++;
-                //System.out.println("Tie found for computeMaxSubtreeCCP.");
+                // System.out.println("Tie found for computeMaxSubtreeCCP.");
                 Clade smallCladeMax = maxSubtreeCCPPartition.getSmallerChild();
                 Clade smallCladeCurrent = partition.getSmallerChild();
 
@@ -548,6 +592,8 @@ public class Clade {
                     BitSet bitsCurrent = smallCladeCurrent.getCladeInBits();
 
                     if (bitsMax.equals(bitsCurrent)) {
+                        System.err.println(maxSubtreeCCPPartition);
+                        System.err.println(partition);
                         throw new AssertionError("Tie breaking failed - duplicate partitions detected!");
                     }
 
@@ -559,7 +605,7 @@ public class Clade {
                 }
             }
         }
-        
+
         // TODO consider tie breaking mechanisms
     }
 
@@ -649,92 +695,8 @@ public class Clade {
         this.sumCladeCredibilities = value;
     }
 
-    /* -- CLADE COMPARISONS -- */
-
     /**
-     * Returns whether this clade contains the given clade as (not-necessarily
-     * proper) subclade.
-     *
-     * @param potentialSubclade to be tested if contained in this clade
-     * @return whether this clade contains the given clade as subclade
-     */
-    public boolean containsClade(Clade potentialSubclade) {
-        return contains(potentialSubclade.getCladeInBits());
-    }
-
-    /**
-     * Returns whether this clade contains the given BitSet.
-     *
-     * @param filter to be tested if contained in this clade
-     * @return whether this clade contains the given filter
-     */
-    public boolean contains(BitSet filter) {
-        return BitSetUtil.contains(this.cladeAsBitSet, filter);
-    }
-
-    /**
-     * Returns whether this clade is contained in the given BitSet.
-     *
-     * @param filter to be tested if contains this clade
-     * @return whether this clade is contained in the given BitSet
-     */
-    public boolean contained(BitSet filter) {
-        return BitSetUtil.contains(filter, this.cladeAsBitSet);
-    }
-
-    /**
-     * Returns whether this clade intersects the given clade.
-     *
-     * @param potentialIntersectedClade to be tested if intersects with this clade
-     * @return whether this clade intersects the given clade
-     */
-    public boolean intersects(Clade potentialIntersectedClade) {
-        return this.intersects(potentialIntersectedClade.getCladeInBits());
-    }
-
-    /**
-     * Returns whether this clade intersects the given BitSet.
-     *
-     * @param filter to be tested if intersects with this clade
-     * @return whether this clade intersects the given filter
-     */
-    public boolean intersects(BitSet filter) {
-        return this.cladeAsBitSet.intersects(filter);
-    }
-
-    /**
-     * Returns whether this clade (as BitSet) equals the given BitSet.
-     *
-     * @param filter to be tested if equals with this clade
-     * @return whether this clade equals the given filter
-     */
-    public boolean equals(BitSet filter) {
-        return this.cladeAsBitSet.equals(filter);
-    }
-
-    /* -- BASE CLADE 4 FILTERED CCDs -- */
-    /**
-     * Clade this one is based one; can be used for filtered clades.
-     */
-    private Clade baseClade;
-
-    /**
-     * @return the base clade of this clade (when clade comes from filtering)
-     */
-    public Clade getBaseClade() {
-        return baseClade;
-    }
-
-    /**
-     * @param baseClade set as base clade of this clade (when clade comes from
-     *                  filtering)
-     */
-    protected void setBaseClade(Clade baseClade) {
-        this.baseClade = baseClade;
-    }
-
-    /**
-     * Better to call {@link ITreeDistribution#getProbabilityOfClade(BitSet)} to
+     * Better to call {@link ITreeDistribution#getCladeProbability(BitSet)} to
      * get this value. Returns the probability of this clade appearing in a tree
      * of a distribution ({@link ITreeDistribution}), if computed by the
      * distribution; otherwise returns -1;
@@ -756,29 +718,91 @@ public class Clade {
         this.probability = probability;
     }
 
+
+    /* -- CLADE COMPARISONS -- */
+
     /**
-     * Returns a set of all descendant clades (or up to monophyletic) of this clade.
+     * Returns whether this clade contains the given clade as (not-necessarily
+     * proper) subclade.
      *
-     * @param untilMonophyletics whether to not collect descendants of monophyletic descendant clades as well
-     * @return set of all descendant clades (or up to monophyletic) of this clade
+     * @param potentialSubclade to be tested if contained in this clade
+     * @return whether this clade contains the given clade as subclade
      */
-    public Set<Clade> getDescendantClades(boolean untilMonophyletics) {
-        Set<Clade> descendants = new HashSet<Clade>();
-
-        for (Clade child : this.getChildClades()) {
-            child.collectDescendantClades(untilMonophyletics, descendants);
-        }
-
-        return descendants;
+    public boolean containsClade(Clade potentialSubclade) {
+        return contains(potentialSubclade.getCladeInBits());
     }
 
-    private void collectDescendantClades(boolean untilMonophyletics, Set<Clade> descendants) {
-        if (descendants.add(this)) {
-            if (!untilMonophyletics || !this.isMonophyletic()) {
-                for (Clade child : this.getChildClades()) {
-                    child.collectDescendantClades(untilMonophyletics, descendants);
-                }
-            }
-        }
+    /**
+     * Returns whether this clade contains the given BitSet.
+     *
+     * @param mask to be tested if contained in this clade
+     * @return whether this clade contains the given filter
+     */
+    public boolean contains(BitSet mask) {
+        return BitSetUtil.contains(this.cladeAsBitSet, mask);
     }
+
+    /**
+     * Returns whether this clade is contained in the given BitSet.
+     *
+     * @param mask to be tested if contains this clade
+     * @return whether this clade is contained in the given BitSet
+     */
+    public boolean contained(BitSet mask) {
+        return BitSetUtil.contains(mask, this.cladeAsBitSet);
+    }
+
+    /**
+     * Returns whether this clade intersects the given clade.
+     *
+     * @param potentialIntersectedClade to be tested if intersects with this clade
+     * @return whether this clade intersects the given clade
+     */
+    public boolean intersects(Clade potentialIntersectedClade) {
+        return this.intersects(potentialIntersectedClade.getCladeInBits());
+    }
+
+    /**
+     * Returns whether this clade intersects the given BitSet.
+     *
+     * @param mask to be tested if intersects with this clade
+     * @return whether this clade intersects the given filter
+     */
+    public boolean intersects(BitSet mask) {
+        return this.cladeAsBitSet.intersects(mask);
+    }
+
+    /**
+     * Returns whether this clade (as BitSet) equals the given BitSet.
+     *
+     * @param mask to be tested if equals with this clade
+     * @return whether this clade equals the given filter
+     */
+    public boolean equals(BitSet mask) {
+        return this.cladeAsBitSet.equals(mask);
+    }
+
+
+    /* -- BASE CLADE 4 FILTERED CCDs -- */
+
+    /**
+     * Clade this one is based one; can be used for filtered clades.
+     */
+    private Clade baseClade;
+
+    /**
+     * @return the base clade of this clade (when clade comes from filtering)
+     */
+    public Clade getBaseClade() {
+        return baseClade;
+    }
+
+    /**
+     * @param baseClade set as base clade of this clade (when clade comes from
+     *                  filtering)
+     */
+    protected void setBaseClade(Clade baseClade) {
+        this.baseClade = baseClade;
+    }
+
 }

@@ -3,10 +3,7 @@ package ccd.model;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
-import java.util.ArrayList;
-//import java.util.BitSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * This class represents a tree distribution via the conditional clade
@@ -75,28 +72,10 @@ public class CCD1 extends AbstractCCD {
         super(numLeaves, storeBaseTrees);
     }
 
-
-    /* -- GENERAL GETTERS & SETTERS -- */
-
-    /**
-     * @return number of leaves/taxa remaining in the trees represented by this
-     * CCD, which only differs from {@link CCD1#getNumberOfLeaves()} if
-     * this is a {@link FilteredConditionalCladeDistribution}
-     */
-    public int getNumberOfActualLeaves() {
-        return this.getNumberOfLeaves();
-    }
-
-    /**
-     * @return the taxa of this CCD as BitSet with length based on original
-     * number of leaves (only different if this a
-     * {@link FilteredConditionalCladeDistribution})
-     */
     @Override
-    public BitSet getTaxaAsBitSet() {
-        return this.rootClade.getCladeInBits();
+    public void initialize() {
+        // nothing to do for CCD1s
     }
-
 
     /* -- STATE MANAGEMENT - STATE MANAGEMENT -- */
     @Override
@@ -113,7 +92,7 @@ public class CCD1 extends AbstractCCD {
     protected void checkCladePartitionRemoval(Clade clade, CladePartition partition) {
         // when a partition has no registered occurrences more, we can remove it
         if (partition.getNumberOfOccurrences() == 0) {
-            clade.partitions.remove(partition);
+            clade.removePartition(partition);
         }
     }
 
@@ -123,88 +102,20 @@ public class CCD1 extends AbstractCCD {
 
 
     /* -- OTHER METHODS -- */
-    public List<CladePartition> findAttachmentPointsOfClade(Clade attachingClade) {
-        // TODO WORK IN PRORGESS
-        ArrayList<CladePartition> parentPartitions = new ArrayList<CladePartition>();
-        for (Clade clade : cladeMapping.values()) {
-            if (clade == attachingClade) {
-                continue;
-            } else if (clade.containsClade(attachingClade)) {
-                for (CladePartition partition : clade.getPartitions()) {
-                    if (partition.containsChildClade(attachingClade)) {
-                        parentPartitions.add(partition);
-                    }
-                }
-            }
-        }
-
-        return parentPartitions;
-    }
 
     @Override
     public String toString() {
-        return "CCD0 " + super.toString();
+        return "CCD1 " + super.toString();
     }
 
     @Override
-    public void initialize() {
-        // Empty Function
-    }
-
-    /**
-     * Create a (deep) copy of this CCD, so with copies of the Clades and
-     * CladePartitions; copies at most one stored tree.
-     *
-     * @return a (deep) copy of this CCD
-     */
-    public CCD1 copy() {
-        CCD1 copy = new CCD1(this.getNumberOfLeaves(), false);
+    public AbstractCCD copy() {
+        CCD1 copy = new CCD1(this.getSizeOfLeavesArray(), false);
         copy.baseTrees.add(this.getSomeBaseTree());
 
-        for (Clade originalClade : this.getClades()) {
-            Clade copiedClade = originalClade.copy(copy);
-            copy.cladeMapping.put(originalClade.getCladeInBits(), copiedClade);
-        }
-        copy.rootClade = cladeMapping.get(this.getRootClade().getCladeInBits());
-
-        for (Clade originalClade : this.getClades()) {
-            for (CladePartition originalPartition : originalClade.getPartitions()) {
-                Clade copiedParent = copy.cladeMapping.get(originalClade.getCladeInBits());
-                Clade copiedChildFirst = copy.cladeMapping
-                        .get(originalPartition.getChildClades()[0].getCladeInBits());
-                Clade copiedChildSecond = copy.cladeMapping
-                        .get(originalPartition.getChildClades()[1].getCladeInBits());
-
-                CladePartition copiedPartition = copiedParent.createCladePartition(copiedChildFirst,
-                        copiedChildSecond, true);
-                if (originalPartition.getNumberOfOccurrences() <= 0) {
-                    copiedPartition.setCCP(originalPartition.getCCP());
-                } else {
-                    copiedPartition.increaseOccurrenceCountBy(
-                            originalPartition.getNumberOfOccurrences(),
-                            originalPartition.getMeanOccurredHeight());
-                }
-            }
-        }
+        AbstractCCD.buildCopy(this, copy);
 
         return copy;
     }
-
-    private double lostProbability1(Clade clade, Set<Clade> excludedCladePartitions) {
-        double lostProbability = 0.0;
-        for (CladePartition partition : clade.getPartitions()) {
-            Clade firstChild = partition.getChildClades()[0];
-            Clade secondChild = partition.getChildClades()[1];
-
-            if (excludedCladePartitions.contains(partition)) {
-                lostProbability += partition.getCCP();
-            } else {
-                lostProbability += partition.getCCP() *
-                        lostProbability1(firstChild, excludedCladePartitions) *
-                        lostProbability1(secondChild, excludedCladePartitions);
-            }
-        }
-        return lostProbability;
-    }
-
+    
 }

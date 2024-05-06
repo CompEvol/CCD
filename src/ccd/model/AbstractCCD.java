@@ -6,7 +6,16 @@ import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
 
 /**
  * <p>
@@ -59,7 +68,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /**
      * Number of leaves/taxa the trees this CCD is based on.
      */
-    protected int numLeaves;
+    protected int leafArraySize;
 
     /**
      * Mapping from a BitSet representation to a clade; used to ensure
@@ -168,9 +177,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /* Initialization helper method */
     private void initializeRootClade(int numLeaves) {
-        this.numLeaves = numLeaves;
+        this.leafArraySize = numLeaves;
 
-        BitSet rootBitSet = BitSet.newBitSet(numLeaves);
+        BitSet rootBitSet = BitSet.newBitSet(leafArraySize);
         rootBitSet.set(0, numLeaves);
 
         this.rootClade = new Clade(rootBitSet, this);
@@ -195,12 +204,12 @@ public abstract class AbstractCCD implements ITreeDistribution {
         } else if (this.baseTrees.isEmpty()) {
             this.baseTrees.add(tree);
         }
-        addClade(tree.getRoot());
+        cladifyVertex(tree.getRoot());
     }
 
     /* Recursive helper method */
-    private Clade addClade(Node vertex) {
-        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
+    private Clade cladifyVertex(Node vertex) {
+        BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
         Clade firstChildClade = null;
         Clade secondChildClade = null;
 
@@ -208,8 +217,8 @@ public abstract class AbstractCCD implements ITreeDistribution {
             int index = vertex.getNr();
             cladeInBits.set(index);
         } else {
-            firstChildClade = addClade(vertex.getChildren().get(0));
-            secondChildClade = addClade(vertex.getChildren().get(1));
+            firstChildClade = cladifyVertex(vertex.getChildren().get(0));
+            secondChildClade = cladifyVertex(vertex.getChildren().get(1));
 
             cladeInBits.or(firstChildClade.getCladeInBits());
             cladeInBits.or(secondChildClade.getCladeInBits());
@@ -217,8 +226,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
         Clade currentClade = cladeMapping.get(cladeInBits);
         if (currentClade == null) {
-            currentClade = new Clade(cladeInBits, this);
-            cladeMapping.put(cladeInBits, currentClade);
+            currentClade = addNewClade(cladeInBits);
         }
         currentClade.increaseOccurrenceCount(vertex.getHeight());
 
@@ -233,6 +241,19 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
 
         return currentClade;
+    }
+
+    /**
+     * Adds and returns a new clade to this CCD based on the given BitSet.
+     * Assumes that the clade does not exist yet; otherwise future behaviour is undefined.
+     *
+     * @param cladeInBits BitSet describing new clade; should not exist yet
+     * @return newly added clade
+     */
+    protected Clade addNewClade(BitSet cladeInBits) {
+        Clade clade = new Clade(cladeInBits, this);
+        cladeMapping.put(cladeInBits, clade);
+        return clade;
     }
 
     /**
@@ -264,7 +285,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /* Recursive helper method */
     private Clade reduceCladeCount(Node vertex) {
         // 1. build BitSet to retrieve clade and call recursion
-        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
+        BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
         Clade firstChildClade = null;
         Clade secondChildClade = null;
 
@@ -318,20 +339,20 @@ public abstract class AbstractCCD implements ITreeDistribution {
         for (Clade clade : this.getCladeMapping().values()) {
             if (clade.isLeaf()) {
                 if (clade.getParentClades().isEmpty()) {
-                    System.out.println("- leaf "
-                            + clade.getCladeInBits() + " (" + this.baseTrees.get(0)
-                            .getNode(clade.getCladeInBits().nextSetBit(0)).getID()
-                            + ") has no parent clade!");
+//                    System.out.println("- leaf "
+//                            + clade.getCladeInBits() + " (" + this.baseTrees.get(0)
+//                            .getNode(clade.getCladeInBits().nextSetBit(0)).getID()
+//                            + ") has no parent clade!");
                     complete = false;
                 }
             } else if (clade == this.rootClade) {
                 if (clade.getPartitions().isEmpty()) {
-                    System.out.println("- root clade has no partitions!");
+//                    System.out.println("- root clade has no partitions!");
                     complete = false;
                 }
             } else if (clade.getParentClades().isEmpty() || clade.getPartitions().isEmpty()
                     || (clade.getNumberOfOccurrences() == 0)) {
-                System.out.println("- clade found to remove: " + clade.getCladeInBits());
+                // System.out.println("- clade found to remove: " + clade.getCladeInBits());
                 cladesToRemove.add(clade);
             }
         }
@@ -397,14 +418,15 @@ public abstract class AbstractCCD implements ITreeDistribution {
                     }
                 }
             }
+            // do not have to empty partitions of clade, since it is dumped anyway
         }
 
-        if ((numCladesRemoved > 0) || (numPartitionsRemoved > 0)) {
+        /*- if ((numCladesRemoved > 0) || (numPartitionsRemoved > 0)) {
             System.out.println("Tidying up CCD - removed " + numCladesRemoved + " clades and " + numPartitionsRemoved + " clade partitions.");
             if (!complete) {
                 System.out.println("=> CCD is not complete anymore (contains no tree or only incomplete ones)!");
             }
-        }
+        }*/
 
         return complete;
     }
@@ -425,7 +447,18 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     @Override
     public int getNumberOfLeaves() {
-        return numLeaves;
+        return leafArraySize;
+    }
+
+    /**
+     * Returns the size of the arrays working with the leaves.
+     * This should differ only from the number of leaves (cf. {@link AbstractCCD#getNumberOfLeaves()})
+     * if leaves have been removed, for example, when filtering in a {@link FilteredCCD}.
+     *
+     * @return the size of the arrays working with the leaves
+     */
+    public int getSizeOfLeavesArray() {
+        return leafArraySize;
     }
 
     /**
@@ -466,7 +499,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /**
      * @return the taxa of this CCD as BitSet with length based on original
      * number of leaves (only different if this a
-     * {@link FilteredConditionalCladeDistribution})
+     * {@link FilteredCCD})
      */
     public BitSet getTaxaAsBitSet() {
         return this.rootClade.getCladeInBits();
@@ -485,6 +518,16 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     public int getNumberOfBaseTrees() {
         return this.numBaseTrees;
+    }
+
+    /**
+     * <i>Use only with extra care and if you know what you are doing!</i>
+     * Manually set the number of base trees of this CCD.
+     *
+     * @param newNumberOfBaseTrees new value
+     */
+    public void setNumBaseTrees(int newNumberOfBaseTrees) {
+        this.numBaseTrees = newNumberOfBaseTrees;
     }
 
     /**
@@ -510,17 +553,17 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /**
      * Whether cached probability values are out of date.
      */
-    private boolean probabilitiesDirty = false;
+    protected boolean probabilitiesDirty = false;
 
     /**
      * Whether cached entropy values are out of date.
      */
-    private boolean entropyDirty = false;
+    protected boolean entropyDirty = false;
 
     /**
      * Whether cached numbers of topologies are out of date.
      */
-    private boolean numberOfTopologiesDirty = false;
+    protected boolean numberOfTopologiesDirty = false;
 
     /**
      * Sets CCD as dirty lazily, meaning cached values become out of date and
@@ -608,10 +651,10 @@ public abstract class AbstractCCD implements ITreeDistribution {
     protected Tree getTreeBasedOnStrategy(SamplingStrategy samplingStrategy,
                                           HeightSettingStrategy heightStrategy) {
         tidyUpCacheIfDirty();
-        resetCacheIfProbabilitiesDirty();
 
         runningIndex = this.getNumberOfLeaves();
         Node root = getVertexBasedOnStrategy(this.rootClade, samplingStrategy, heightStrategy);
+        cleanUpNodeIndices(root);
         Tree tree = new Tree(root);
 
         if (heightStrategy == HeightSettingStrategy.MeanLCAHeight) {
@@ -623,16 +666,24 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return tree;
     }
 
+    private void cleanUpNodeIndices(Node root) {
+        if (root.getNr() != (root.getNodeCount() - 1)) {
+            System.out.println("clean up node indices");
+            // int maxIndex = root.getNr();
+            // List<Node> leaves = root.getAllLeafNodes();
+            // for (Node leaf : leaves) {
+            //     // leaf. TODO
+            // }
+        }
+    }
+
     /* Recursive helper method */
     private Node getVertexBasedOnStrategy(Clade clade, SamplingStrategy samplingStrategy,
                                           HeightSettingStrategy heightStrategy) {
         Node vertex = null;
         if (clade.isLeaf()) {
             int leafNr = clade.getCladeInBits().nextSetBit(0);
-
-//            String taxonName = baseTrees.get(0).getNode(leafNr).getID(); // todo this is causing a Null Pointer Error
-            // Todo not sure if this makes sense -- seems to work at the moment -- why?
-            String taxonName = baseTrees.get(0).getTaxaNames()[leafNr];
+            String taxonName = this.getSomeBaseTree().getTaxaNames()[leafNr];
 
             vertex = new Node(taxonName);
             vertex.setNr(leafNr);
@@ -642,9 +693,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
         } else {
             CladePartition partition = getPartitionBasedOnStrategy(clade, samplingStrategy);
             if (partition == null) {
-                System.out.println("clade got no partition - " + clade.getCladeInBits());
+                System.err.println("clade has no partition - " + clade.getCladeInBits());
                 for (CladePartition partition2 : clade.getPartitions()) {
-                    System.out.println(partition2.toString());
+                    System.err.println(partition2.toString());
                 }
             }
 
@@ -653,8 +704,10 @@ public abstract class AbstractCCD implements ITreeDistribution {
             Node secondChild = getVertexBasedOnStrategy(partition.getChildClades()[1],
                     samplingStrategy, heightStrategy);
 
-            String id = runningIndex + "";
-            vertex = new Node(id);
+            // These are not needed and only make the output newick longer
+//            String id = runningIndex + "";
+//            vertex = new Node(id);
+            vertex = new Node();
             vertex.setNr(runningIndex++);
             vertex.addChild(firstChild);
             vertex.addChild(secondChild);
@@ -801,7 +854,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /* Recursive helper method */
     private Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability) {
-        BitSet cladeInBits = BitSet.newBitSet(numLeaves);
+        BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
 
         if (vertex.isLeaf()) {
             int index = vertex.getNr();
@@ -848,7 +901,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     @Override
-    public double getProbabilityOfClade(BitSet cladeInBits) {
+    public double getCladeProbability(BitSet cladeInBits) {
         resetCacheIfProbabilitiesDirty();
 
         Clade clade = cladeMapping.get(cladeInBits);
@@ -869,6 +922,12 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     public void computeCladeProbabilities() {
         resetCacheIfProbabilitiesDirty();
+
+        if (rootClade.getProbability() > 0) {
+            // if values have already been computed and nothing was dirty,
+            // then no need to do again
+            return;
+        }
 
         // the probability of a clade in a CCD is given by the sum of products
         // of probabilities along any path from the root to that clade;
@@ -994,6 +1053,42 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /* -- OTHER METHODS -- */
 
     /**
+     * Create a (deep) copy of this CCD, so with copies of the Clades and
+     * CladePartitions; copies at most one stored tree.
+     *
+     * @return a (deep) copy of this CCD
+     */
+    public abstract AbstractCCD copy();
+
+    protected static void buildCopy(AbstractCCD original, AbstractCCD copy) {
+        for (Clade originalClade : original.getClades()) {
+            Clade copiedClade = originalClade.copy(copy);
+            copy.cladeMapping.put(originalClade.getCladeInBits(), copiedClade);
+        }
+        copy.rootClade = copy.cladeMapping.get(original.getRootClade().getCladeInBits());
+
+        for (Clade originalClade : original.getClades()) {
+            for (CladePartition originalPartition : originalClade.getPartitions()) {
+                Clade copiedParent = copy.cladeMapping.get(originalClade.getCladeInBits());
+                Clade copiedChildFirst = copy.cladeMapping
+                        .get(originalPartition.getChildClades()[0].getCladeInBits());
+                Clade copiedChildSecond = copy.cladeMapping
+                        .get(originalPartition.getChildClades()[1].getCladeInBits());
+
+                CladePartition copiedPartition = copiedParent.createCladePartition(copiedChildFirst,
+                        copiedChildSecond, true);
+                if (originalPartition.getNumberOfOccurrences() <= 0) {
+                    copiedPartition.setCCP(originalPartition.getCCP());
+                } else {
+                    copiedPartition.increaseOccurrenceCountBy(
+                            originalPartition.getNumberOfOccurrences(),
+                            originalPartition.getMeanOccurredHeight());
+                }
+            }
+        }
+    }
+
+    /**
      * Returns the names of the taxa specified by the mask as "{name1, name2,
      * ...}".
      *
@@ -1011,9 +1106,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     @Override
     public String toString() {
-        return "[number of leaves: " + this.numLeaves + ", number of clades: "
+        return "[number of leaves: " + this.leafArraySize + ", number of clades: "
                 + this.getNumberOfClades() + ", max probability: " + this.getMaxTreeProbability()
-                + ", entropy: " + this.getEntropy() + "taxa: " + this.getTaxaAsBitSet() + "]";
+                + ", entropy: " + this.getEntropy() + ", taxa: " + this.getTaxaAsBitSet() + "]";
     }
 
     public abstract void initialize();

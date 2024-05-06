@@ -1,11 +1,15 @@
 package ccd.model;
 
-import beast.base.core.Log;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
 import java.io.PrintStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.ConcurrentModificationException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,6 +41,35 @@ import java.util.concurrent.RejectedExecutionException;
  * @author Jonathan Klawitter
  */
 public class CCD0 extends AbstractCCD {
+
+    /** Whether expand should use the monophyletic clade speedup. */
+    private boolean useMonophyleticCladeSpeedup = false;
+
+    /** Whether expand should run update online (instead of from scratch). */
+    private boolean updateOnline = false;
+
+    /** Clades added since last expand (for online expand). */
+    private List<Clade> newClades = null;
+
+    /** Clades organized by size for more efficient expand method. */
+    private List<Set<Clade>> cladeBuckets = null;
+
+    /** Clades already processed */
+    private Set<Clade> done;
+
+    /** Stream to report on progress of CCD0 construction. */
+    private PrintStream progressStream;
+
+    /** Progress counted of clades handled in the expand step. */
+    private int progressed = 0;
+
+    // variables for parallelization
+    /** Threshold of number of clades on whether to use parallelization for expand. */
+    public static final int NUM_CLADES_PARALLELIZATION_THRESHOLD = 20000;
+
+    /** Number of worker threads used for the expand step. */
+    private int threadCount = 1;
+    private CountDownLatch countDown = null;
 
     /* -- CONSTRUCTORS & CONSTRUCTION METHODS -- */
 
@@ -70,6 +103,32 @@ public class CCD0 extends AbstractCCD {
     }
 
     /**
+     * Constructor for a {@link CCD0} based on the given collection of trees
+     * (not containing any burnin trees) wit the given flags.
+     *
+     * @param treeSet                     an iterable set of trees, which contains no burnin trees,
+     *                                    whose distribution is approximated by the resulting
+     *                                    {@link CCD0}
+     * @param storeBaseTrees              whether to store the trees used to create this CCD
+     * @param useMonophyleticCladeSpeedup try to speed up expand step by considering monophyletic clades
+     *                                    (mutually exclusive with online speedup)
+     * @param updateOnline                speed up expand step by using an online version;
+     *                                    online useful if more trees are added later
+     *                                    and CCD gets reinitialized repeatedly
+     *                                    (mutually exclusive with monophyletic clades speedup)
+     */
+    public CCD0(TreeSet treeSet, boolean storeBaseTrees, boolean useMonophyleticCladeSpeedup, boolean updateOnline) {
+        super(treeSet, storeBaseTrees);
+        if (useMonophyleticCladeSpeedup) {
+            this.setToUseMonophyleticCladeSpeedup();
+        }
+        if (updateOnline) {
+            this.setToUpdateOnline();
+        }
+        initialize();
+    }
+
+    /**
      * Constructor for an empty CDD. Trees can then be processed one by one.
      *
      * @param numLeaves      number of leaves of the trees that this CCD will be based on
@@ -80,17 +139,65 @@ public class CCD0 extends AbstractCCD {
         super(numLeaves, storeBaseTrees);
     }
 
+    /**
+     * Configure this CCD0 to try to speed up the expand step
+     * by looking for monophyletic clades.
+     */
+    public void setToUseMonophyleticCladeSpeedup() {
+        if (this.useMonophyleticCladeSpeedup) {
+            System.err.println("Cannot use monophyletic clade speedup " +
+                    "when online speedup is already used for the CCD0 expand step.");
+            return;
+        }
+        this.useMonophyleticCladeSpeedup = true;
+    }
+
+    /**
+     * Configure this CCD0 to run the expand step online,
+     * meaning clades added since last expand are stored
+     * and only expands containing them are checked.
+     * This is mutually exclusive to using the monophyletic clades speedup.
+     */
+    public void setToUpdateOnline() {
+        if (this.useMonophyleticCladeSpeedup) {
+            System.err.println("Cannot use online speedup when monophyletic clade speedup " +
+                    "is already used for the CCD0 expand step.");
+            return;
+        }
+        this.updateOnline = true;
+        this.newClades = new ArrayList<>();
+    }
+
+    /**
+     * @param progressStream stream used to report on construction
+     *                       (adding trees and expand steps)
+     */
+    public void setProgressStream(PrintStream progressStream) {
+        this.progressStream = progressStream;
+    }
+
+    /** Whether a progress stream has been set. */
+    private boolean hasProgressStream() {
+        return (progressStream != null);
+    }
+
+    @Override
+    protected Clade addNewClade(BitSet cladeInBits) {
+        Clade clade = super.addNewClade(cladeInBits);
+        if (updateOnline) {
+            this.newClades.add(clade);
+        }
+        this.dirtyStructure = true;
+
+        return clade;
+    }
+
     /* -- STATE MANAGEMENT & INITIALIZATION -- */
     /**
      * Whether the CCD graph is expanded and CCPs renormalized.
      */
     private boolean dirtyStructure = true;
-    private PrintStream progressStream;
-    
-    public void setProgressStream(PrintStream progressStream) {
-    	this.progressStream = progressStream;
-    }
-    
+
     @Override
     public void setCacheAsDirty() {
         super.setCacheAsDirty();
@@ -102,12 +209,15 @@ public class CCD0 extends AbstractCCD {
         if (dirtyStructure) {
             super.resetCache();
             this.initialize();
+        } else {
+            super.resetCacheIfProbabilitiesDirty();
         }
     }
 
     @Override
     protected void checkCladePartitionRemoval(Clade clade, CladePartition partition) {
-        // do nothing here
+        // nothing to do here for CCD0s
+        // since we keep partitions even if they have no occurrence counts
     }
 
     /**
@@ -118,146 +228,145 @@ public class CCD0 extends AbstractCCD {
     public void initialize() {
         // need to find all clade partitions that could exist but were not
         // observed in base trees
-        //System.out.print("\nExpanding CCD graph ... ");
-        expand();
+        if (!updateOnline || (cladeBuckets == null)) {
+            // System.out.print("Initializing CCD0 parameters ... ");
+            expand();
+        } else {
+            // System.out.print("\nExpanding CCD graph (online) ... ");
+            expandOnline();
+        }
 
         // then need to set clade partition probabilities
         // which normalizes the product of clade probabilities
-        //System.out.print("setting probabilities ... ");
+        // System.out.print("setting probabilities ... ");
         setPartitionProbabilities(this.rootClade);
 
-        //System.out.println("done.\n");
+        // System.out.println(" ...done.");
+        if (updateOnline) {
+            newClades.clear();
+        }
         this.dirtyStructure = false;
+        super.setCacheAsDirty();
     }
 
-    /*
+    /**
      * Expand CCD graph with clade partitions where parent and children were
      * observed, but not that clade partition.
      */
     private void expand() {
-    	long start = System.currentTimeMillis();
         // System.out.print("Expand ... ");
-        int n = this.getNumberOfLeaves();
+        long start = System.currentTimeMillis();
 
-        // 1. clade buckets
-        // for easier matching of child clades, we want to group them by size
-        // 1.i sort clades
-        Clade [] clades = cladeMapping.values().stream().sorted(Comparator.comparingInt(x -> x.getCladeInBits().cardinality()))
-                .toArray(Clade[]::new);
-
-		expand(clades, n);
-        
-//        for (int i = 0; i < clades.length; i++) {
-//        	final Clade parent = clades[i];
-//        	if (parent.isMonophyletic()) {
-//        		List<Clade> clades0 = new ArrayList<>();
-//        		for (int j = 0; j < i; j++) {
-//        			if (clades[j] != null && parent.containsClade(clades[j])) {
-//        				clades0.add(clades[j]);
-//        				clades[j] = null;
-//        			}
-//        		}
-//        		clades0.add(parent);
-//        		expand(clades0, n);
-//        	}
-//        }
-		
-    	long end = System.currentTimeMillis();
-    	Log.warning("expand in " + (end-start)/1000 + " seconds");
-    }
-        
-    private void expand(Clade [] clades, int n) {
-    	progressStream.println("processing " + clades.length + " clades");
-
-        // 1.ii init clade buckets
-        List<Set<Clade>> cladeBuckets = new ArrayList<Set<Clade>>(n);
-        for (int i = 0; i < n; i++) {
-            if (i < 3) {
-                cladeBuckets.add(new HashSet<Clade>(n));
-            } else {
-                cladeBuckets.add(new HashSet<Clade>());
-            }
+        // 1. sort clades
+        List<Clade> clades = cladeMapping.values().stream().sorted(Comparator.comparingInt(x -> x.size())).toList();
+        if (hasProgressStream()) {
+            progressStream.println("processing " + clades.size() + " clades");
         }
-        // 1.iii fill clade buckets
+
+        // 2. clade buckets
+        // for easier matching of child clades, we want to group them by size
+        // 2.i init clade buckets
+        cladeBuckets = new ArrayList<Set<Clade>>(leafArraySize);
+        for (int i = 0; i < leafArraySize; i++) {
+            cladeBuckets.add(new HashSet<Clade>());
+        }
+        // 2.ii fill clade buckets
         for (Clade clade : clades) {
             cladeBuckets.get(clade.size() - 1).add(clade);
         }
 
-        // 2. find missing clade partitions
+        // 3. find missing clade partitions
+        done = new HashSet<>();
         threadCount = Runtime.getRuntime().availableProcessors();
-    	done = new HashSet<>();
-        if (threadCount <= 1 || clades.length < 20000) {
-        	findPartitions(clades, cladeBuckets);
+        if (threadCount <= 1 || clades.size() < NUM_CLADES_PARALLELIZATION_THRESHOLD
+                || updateOnline) {
+            threadCount = 1;
+            findChildPartitions(clades);
         } else {
             try {
-            	System.out.println("Running with " + threadCount + " threads");
+                System.out.println("Running expand step with " + threadCount + " threads.");
                 countDown = new CountDownLatch(threadCount);
                 ExecutorService exec = Executors.newFixedThreadPool(threadCount);
-                // kick off the threads
-                int end = clades.length;
+                int end = clades.size();
                 for (int i = 0; i < threadCount; i++) {
-                    CoreRunnable coreRunnable = new CoreRunnable(clades, cladeBuckets, i, end);
+                    ExpandWorker coreRunnable = new ExpandWorker(clades, i, end);
                     exec.execute(coreRunnable);
                 }
                 countDown.await();
-                exec. shutdownNow();
+                exec.shutdownNow();
             } catch (RejectedExecutionException | InterruptedException e) {
+                // do nothing
             }
-        	
+            done.clear();
         }
 
         // System.out.println("done.");
+        long end = System.currentTimeMillis();
+        // Log.warning("Expanded CCD0 in " + (end - start) / 1000 + " seconds.");
+        progressStream = null;
     }
-    
-    
-    private CountDownLatch countDown = null;
-    private int progressed = 0;
-    private int threadCount = 4;
-    private Set<Clade> done;
 
-    class CoreRunnable implements java.lang.Runnable {
-    	Clade[] clades;
-    	List<Set<Clade>> cladeBuckets;
-    	int start;
-    	int end;
-    	
-        CoreRunnable(Clade[] clades, List<Set<Clade>> cladeBuckets, int start, int end) {
-        	this.clades = clades;
-        	this.cladeBuckets = cladeBuckets;
-        	this.start = start;
-        	this.end = end;
+    /**
+     * Like {@link CCD0#expand()}, expand CCD graph with clade partitions where parent (considering only new clades) and children were
+     * observed, but not that clade partition.
+     */
+    private void expandOnline() {
+        // System.out.println("expand online (num trees total = " + this.getNumberOfBaseTrees() + ")");
+
+        // 0. take out clades that have no occurrences left
+        // and do nothing if no new clades remain
+        List<Clade> emptyClades = newClades.stream().filter(x -> (x.getNumberOfOccurrences() != 0)).toList();
+        newClades.removeAll(emptyClades);
+        if (newClades.isEmpty()) {
+            return;
         }
 
-        @Override
-		public void run() {
-        	int i = start;
-        	try {
-	            BitSet helperBits = BitSet.newBitSet(clades[0].getCladeInBits().size());
-	        	while (i < end) {
-	            	findPartitions(clades, cladeBuckets, helperBits, i);
-	        		i += threadCount;
-	        		
-	                if (progressStream != null) {
-	                	while (progressed < i * 61 / clades.length) {
-	                    	progressStream.print("*");
-	                    	progressed++;
-	                	}
-	                }
-	        	}
-        	} catch (Throwable t) {
-        		t.printStackTrace();
-        	}
-        	// progressStream.println("finished " + start + " " + i);
-            countDown.countDown();
+        // 1. sort clades
+        newClades.sort(Comparator.comparingInt(x -> x.size()));
+
+        // 2. update clade buckets
+        for (Clade clade : newClades) {
+            cladeBuckets.get(clade.size() - 1).add(clade);
         }
 
-    } // CoreRunnable
+        // 3.i check for clade partitions of new clades
+        findChildPartitions(newClades);
 
+        // 3.ii check if new clades can form new clade splits
+        findParentPartitions(newClades);
+    }
 
-    private void findPartitions(Clade[] clades, List<Set<Clade>> cladeBuckets, BitSet helperBits, int i) {
+    /**
+     * Find and add clade partitions for each of the given clades
+     * that can be formed by pairs of child clades and that were not in any of the base trees.
+     *
+     * @param parentClades for which we search for new clade partitions
+     */
+    private void findChildPartitions(List<Clade> parentClades) {
+        BitSet helperBits = BitSet.newBitSet(parentClades.get(0).getCCD().getSizeOfLeavesArray());
 
-        Clade parent = clades[i];
+        // we go through clades in increasing size, then check for each clade of
+        // at most half potential parent's size, whether we can find a partner
+        int progressed = 0;
+        int i = 0;
+        for (Clade parent : parentClades) {
+            findChildPartitionsOf(parent, helperBits);
+            if (progressStream != null) {
+                while (progressed < i * 61 / parentClades.size()) {
+                    progressStream.print("*");
+                    progressed++;
+                }
+            }
+            i++;
+        }
 
+        if (progressStream != null) {
+            progressStream.println();
+        }
+    }
+
+    /* Helper method - do the work for one particular clade */
+    private void findChildPartitionsOf(Clade parent, BitSet helperBits) {
         // we skip leaves and cherries as they have no/only one partition
         if (parent.isLeaf() || parent.isCherry()) {
             return;
@@ -268,151 +377,139 @@ public class CCD0 extends AbstractCCD {
         // otherwise we check if we find a larger partner clade for any
         // smaller clade that together partition the parent clade;
         for (int j = 1; j <= parent.size() / 2; j++) {
-        	processSubClades(helperBits, cladeBuckets, j, parentBits, parent);
+            for (Clade smallChild : cladeBuckets.get(j - 1)) {
+                if (done.contains(smallChild)) {
+                    continue;
+                }
+
+                BitSet smallChildBits = smallChild.getCladeInBits();
+                findPartitionHelper(smallChild, parent, helperBits, parentBits, smallChildBits);
+            }
         }
 
-            // remove clades below monophyletic clades
-            if (parent.isMonophyletic()) {
-            	Set<Clade> descendants;
-            	try {
-            		descendants = parent.getDescendantClades(true);
-            	} catch (ConcurrentModificationException e) {
-            		try {
-            			Thread.sleep(100);
-                		descendants = parent.getDescendantClades(true);
-            		} catch (Throwable e2) {
-                		descendants = new HashSet<>();
-            		}
-            	}
-                for (Clade descendant : descendants) {
-                	synchronized(this) {
-                		done.add(descendant);
-                		//cladeBuckets.get(descendant.size() - 1).remove(descendant);
-                	}
-                }
-            }
-    }
-    
-    private void findPartitions(Clade [] clades, List<Set<Clade>> cladeBuckets) {
-        BitSet helperBits = BitSet.newBitSet(clades[0].getCladeInBits().size());
-
-        // we go through clades in increasing size, then check for each clade of
-        // at most half potential parent's size, whether we can find a partner
-        int progressed = 0;
-        for (int i = 0; i < clades.length; i++) {
-            Clade parent = clades[i];
-            if (progressStream != null) {
-            	while (progressed < i * 61 / clades.length) {
-                	progressStream.print("*");
-                	progressed++;
-            	}
-            }
-
-            // we skip leaves and cherries as they have no/only one partition
-            if (parent.isLeaf() || parent.isCherry()) {
-                continue;
-            }
-
-            BitSet parentBits = parent.getCladeInBits();
-
-            // otherwise we check if we find a larger partner clade for any
-            // smaller clade that together partition the parent clade;
-            for (int j = 1; j <= parent.size() / 2; j++) {
-            	processSubClades(helperBits, cladeBuckets, j, parentBits, parent);
-            }
-
-            // remove clades below monophyletic clades
-            if (parent.isMonophyletic()) {
+        // remove clades below monophyletic clades
+        if (useMonophyleticCladeSpeedup && parent.isMonophyletic()) {
+            if (threadCount <= 1) {
                 Set<Clade> descendants = parent.getDescendantClades(true);
                 for (Clade descendant : descendants) {
                     cladeBuckets.get(descendant.size() - 1).remove(descendant);
                 }
-            }
-        }
-        if (progressStream != null) {
-        	progressStream.println();
-        }
-    }
-
-    private void processSubClades(BitSet helperBits, List<Set<Clade>> cladeBuckets, int j, BitSet parentBits, Clade parent) {
-    	
-//    	Clade[] children = null;
-//    	
-//    	synchronized(this) {
-//    		children = cladeBuckets.get(j - 1).toArray(new Clade[] {});
-//    	}
-    	
-        for (Clade smallChild : cladeBuckets.get(j - 1)) {
-        	if (!done.contains(smallChild)) {
-	            BitSet smallChildBits = smallChild.getCladeInBits();
-	
-	            helperBits.clear();
-	            helperBits.or(parentBits);
-	            helperBits.and(smallChildBits);
-	
-	            if (helperBits.equals(smallChildBits)
-	                    && !smallChild.parentClades.contains(parent)) {
-	                // the small child is a subclade of the parent clade
-	                // but is not yet in a partition of the parent clade;
-	                // hence we check all potential partner clades
-	
-	                // here helperBits equal smallChildBits, so with an XOR
-	                // with the parentBits we get the bits of the potential partner clade
-	                helperBits.xor(parentBits);
-	
-	                if (cladeMapping.containsKey(helperBits)) {
-	                    Clade largeChild = cladeMapping.get(helperBits);
-	                    if (threadCount > 1) {
-	                    	synchronized(this) {
-	                    		parent.createCladePartition(smallChild, largeChild);
-	                    	}
-	                    } else {
-	                    	parent.createCladePartition(smallChild, largeChild);
-	                    }
-	                }
-	            }
-        	}
-        }
-	}
-
-	private static void findPartitionsOld(Clade[] clades, List<List<Clade>> cladeBuckets, int[] expandedClades) {
-        // we go through clades in increasing size, then check for each clade of
-        // at most half potential parent's size, whether we can find a partner
-        for (int i = 0; i < clades.length; i++) {
-            Clade parent = clades[i];
-
-            // we skip leaves and cherries as they have no/only one partition
-            if (parent.isLeaf() || parent.isCherry()) {
-                continue;
-            }
-
-            // otherwise we check if we find a larger partner clade for any
-            // smaller clade that together partition the parent clade
-            for (int j = 1; j <= parent.size() / 2; j++) {
-                for (Clade smallChild : cladeBuckets.get(j - 1)) {
-                    if (parent.contains(smallChild.getCladeInBits())
-                            && !smallChild.parentClades.contains(parent)) {
-                        // the small child is a subclade of the parent clade
-                        // but is not yet in a partition of the parent clade;
-                        // hence we check all potential partner clades
-                        for (Clade largeChild : cladeBuckets.get(parent.size() - j - 1)) {
-                            if (parent.contains(largeChild.getCladeInBits())
-                                    && !largeChild.intersects(smallChild)) {
-                                // ... whether they are subclades of the parent,
-                                // but the children's clade do not intersect
-                                parent.createCladePartition(smallChild, largeChild);
-                                expandedClades[parent.size() - 1]++;
-                                // System.err.println("+");
-                            }
-                        }
+            } else {
+                Set<Clade> descendants;
+                try {
+                    descendants = parent.getDescendantClades(true);
+                } catch (ConcurrentModificationException e) {
+                    try {
+                        Thread.sleep(100);
+                        descendants = parent.getDescendantClades(true);
+                    } catch (Throwable e2) {
+                        descendants = new HashSet<>();
+                    }
+                }
+                for (Clade descendant : descendants) {
+                    synchronized (this) {
+                        done.add(descendant);
                     }
                 }
             }
         }
     }
 
-    /* Recursive helper method */
-    private double setPartitionProbabilities(Clade clade) {
+    /**
+     * Find and add clade partitions where each of the given clades is a child clade
+     * and that were not in any of the base trees.
+     *
+     * @param childClades for which we search for new clade partitions
+     */
+    private void findParentPartitions(List<Clade> childClades) {
+        BitSet helperBits = BitSet.newBitSet(childClades.get(0).getCCD().getSizeOfLeavesArray());
+
+        // we go through clades in increasing size, then check for each clade of
+        // at least child's size, whether it can be a parent and if there is a partner
+        for (Clade child : childClades) {
+            BitSet childBits = child.getCladeInBits();
+
+            for (int j = child.size() + 1; j <= leafArraySize; j++) {
+                for (Clade parent : cladeBuckets.get(j - 1)) {
+                    BitSet parentBits = parent.getCladeInBits();
+
+                    findPartitionHelper(child, parent, helperBits, parentBits, childBits);
+                }
+            }
+        }
+    }
+
+    /* Helper method */
+    private void findPartitionHelper(Clade child, Clade parent, BitSet helperBits, BitSet parentBits, BitSet childBits) {
+        // check whether child clade is contained in parent clade
+        helperBits.clear();
+        helperBits.or(parentBits);
+        helperBits.and(childBits);
+
+        if (helperBits.equals(childBits)
+                && !child.parentClades.contains(parent)) {
+            // here helperBits equal childBits, so with an XOR
+            // with the parentBits we get the bits of the potential partner clade
+            helperBits.xor(parentBits);
+            Clade otherChild = cladeMapping.get(helperBits);
+            if (otherChild != null) {
+                if (threadCount > 1) {
+                    synchronized (this) {
+                        parent.createCladePartition(child, otherChild);
+                    }
+                } else {
+                    parent.createCladePartition(child, otherChild);
+                }
+            }
+        }
+    }
+
+    /* Thread worker for embarssingly parallezing parts of the expand step */
+    class ExpandWorker implements Runnable {
+        private List<Clade> clades;
+        private int start;
+        private int end;
+
+        ExpandWorker(List<Clade> clades, int start, int end) {
+            this.clades = clades;
+            this.start = start;
+            this.end = end;
+        }
+
+        @Override
+        public void run() {
+            int i = start;
+            try {
+                BitSet helperBits = BitSet.newBitSet(clades.get(0).getCCD().getSizeOfLeavesArray());
+                while (i < end) {
+                    findChildPartitionsOf(clades.get(i), helperBits);
+                    i += threadCount;
+
+                    if (progressStream != null) {
+                        while (progressed < i * 61 / clades.size()) {
+                            progressStream.print("*");
+                            progressed++;
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+            // progressStream.println("finished " + start + " " + i);
+            countDown.countDown();
+        }
+
+    }
+
+    /**
+     * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
+     * Method only needs to be called when a CCD0 was constructed manually,
+     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
+     *
+     * @param clade for which the clade partition probabilities are computed
+     * @return the sum of this clade's partitions probabilities times its own credibility
+     */
+    public static double setPartitionProbabilities(Clade clade) {
         if (clade.getSumCladeCredibilities() > 0) {
             return clade.getSumCladeCredibilities();
         }
@@ -437,10 +534,9 @@ public class CCD0 extends AbstractCCD {
             // compute sum of probabilities over all partitions ...
             int i = 0;
             for (CladePartition partition : clade.getPartitions()) {
-                double sumPartitionSubtreeCladeCredibility = setPartitionProbabilities(
-                        partition.getChildClades()[0])
-                        * setPartitionProbabilities(partition.getChildClades()[1]);
-                sumPartitionSubtreeProbabilities[i] = sumPartitionSubtreeCladeCredibility;
+                sumPartitionSubtreeProbabilities[i] =
+                        setPartitionProbabilities(partition.getChildClades()[0])
+                                * setPartitionProbabilities(partition.getChildClades()[1]);
                 sumSubtreeProbabilities += sumPartitionSubtreeProbabilities[i];
                 i++;
             }
@@ -449,9 +545,14 @@ public class CCD0 extends AbstractCCD {
             for (CladePartition partition : clade.getPartitions()) {
                 double probability;
                 if (sumSubtreeProbabilities == 0) {
-                    throw new AssertionError("Sum of subtree probabilities should not be 0.");
+                    System.err.println("Sum of subtree probabilities for  partition is 0, which could result from an underflow;" +
+                            "maybe not enough burnin used?");
+                    System.err.println("- parent clade: " + clade);
+                    System.err.println("- partition: " + partition);
+                    probability = 0;
+                } else {
+                    probability = sumPartitionSubtreeProbabilities[i] / sumSubtreeProbabilities;
                 }
-                probability = sumPartitionSubtreeProbabilities[i] / sumSubtreeProbabilities;
                 partition.setCCP(probability);
                 i++;
             }
@@ -462,8 +563,8 @@ public class CCD0 extends AbstractCCD {
             clade.setSumCladeCredibilities(sumCladeCredibilities);
             return sumCladeCredibilities;
         }
-
     }
+
 
     /* -- POINT ESTIMATE METHODS -- */
 
@@ -498,8 +599,26 @@ public class CCD0 extends AbstractCCD {
 
     /* -- OTHER METHODS -- */
     @Override
+    public AbstractCCD copy() {
+        CCD0 copy = new CCD0(this.getSizeOfLeavesArray(), false);
+        copy.baseTrees.add(this.getSomeBaseTree());
+
+        AbstractCCD.buildCopy(this, copy);
+
+        if (this.updateOnline) {
+            copy.setToUpdateOnline();
+        }
+        if (this.useMonophyleticCladeSpeedup) {
+            copy.setToUseMonophyleticCladeSpeedup();
+        }
+        copy.dirtyStructure = this.dirtyStructure;
+
+        return copy;
+    }
+
+    @Override
     public String toString() {
-        return "CCD1 " + super.toString();
+        return "CCD0 " + super.toString();
     }
 
 }
