@@ -1,10 +1,10 @@
 package ccd.algorithms;
 
-import ccp.model.AbstractCCD;
-import ccp.model.AttachingFilteredCCD;
-import ccp.model.BitSet;
-import ccp.model.Clade;
-import ccp.model.FilteredCCD;
+import ccd.model.AbstractCCD;
+import ccd.model.AttachingFilteredCCD;
+import ccd.model.BitSet;
+import ccd.model.Clade;
+import ccd.model.FilteredCCD;
 
 import java.math.BigInteger;
 import java.util.ArrayList;

@@ -1,6 +1,6 @@
 package ccd.model;
 
-import ccp.algorithms.BitSetUtil;
+import ccd.algorithms.BitSetUtil;
 
 import java.math.BigInteger;
 import java.util.Arrays;

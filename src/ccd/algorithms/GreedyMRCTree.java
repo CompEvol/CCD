@@ -2,10 +2,10 @@ package ccd.algorithms;
 
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
-import ccp.model.AbstractCCD;
-import ccp.model.BitSet;
-import ccp.model.Clade;
-import ccp.model.HeightSettingStrategy;
+import ccd.model.AbstractCCD;
+import ccd.model.BitSet;
+import ccd.model.Clade;
+import ccd.model.HeightSettingStrategy;
 
 import java.util.ArrayList;
 import java.util.List;

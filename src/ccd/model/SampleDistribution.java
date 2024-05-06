@@ -4,12 +4,11 @@ import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeUtils;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
-import ccp.algorithms.TreeDistances;
+import ccd.algorithms.TreeDistances;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +42,7 @@ public class SampleDistribution implements ITreeDistribution {
      * BitSet representation to a clade. Assumes that all BitSets have length
      * equal to the number of leaves.
      */
-    private Map<java.util.BitSet, Clade> cladeMapping;
+    private Map<BitSet, Clade> cladeMapping;
 
     /** Random used by this distribution to sample trees. */
     private Random random;
@@ -150,9 +149,9 @@ public class SampleDistribution implements ITreeDistribution {
 
     /* Constructor helper method */
     private void initializeClades() {
-        this.cladeMapping = new HashMap<java.util.BitSet, Clade>();
+        this.cladeMapping = new HashMap<BitSet, Clade>();
         for (WrappedBeastTree wrappedTree : trees) {
-            for (java.util.BitSet cladeInBits : wrappedTree.getClades()) {
+            for (BitSet cladeInBits : wrappedTree.getClades()) {
                 Clade clade = cladeMapping.get(cladeInBits);
                 if (clade == null) {
                     clade = new Clade(cladeInBits, null);
@@ -296,7 +295,7 @@ public class SampleDistribution implements ITreeDistribution {
         double maxCC = 0;
         for (WrappedBeastTree tree : trees) {
             double cladeCredibility = 1;
-            for (java.util.BitSet cladeInBits : tree.getNontrivialClades()) {
+            for (BitSet cladeInBits : tree.getNontrivialClades()) {
                 Clade clade = cladeMapping.get(cladeInBits);
                 if (!clade.isLeaf()) {
                     cladeCredibility *= clade.getNumberOfOccurrences() / (double) this.numBaseTrees;

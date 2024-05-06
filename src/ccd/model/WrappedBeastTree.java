@@ -2,7 +2,7 @@ package ccd.model;
 
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
-import ccp.algorithms.TreeDistances;
+import ccd.algorithms.TreeDistances;
 
 import java.util.ArrayList;
 
