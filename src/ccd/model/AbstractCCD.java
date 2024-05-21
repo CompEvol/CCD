@@ -82,6 +82,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     protected Random random = new Random();
 
+
     /* -- CONSTRUCTORS & CONSTRUCTION METHODS -- */
 
     /**
@@ -130,8 +131,8 @@ public abstract class AbstractCCD implements ITreeDistribution {
             Tree tree = treeSet.next();
             initializeRootClade(tree.getLeafNodeCount());
 
-            System.out.println("Constructing CCD with " + (treeSet.totalTrees - treeSet.burninCount)
-                    + " trees...");
+            System.out.println("Constructing CCD with "
+                    + (treeSet.totalTrees - treeSet.burninCount) + " trees...");
 
             while (tree != null) {
                 this.numBaseTrees++;
@@ -169,14 +170,14 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Base constructor */
-    private AbstractCCD(boolean storeTrees) {
+    protected AbstractCCD(boolean storeTrees) {
         this.storeBaseTrees = storeTrees;
         this.cladeMapping = new HashMap<BitSet, Clade>();
         this.baseTrees = new ArrayList<Tree>(storeTrees ? 1000 : 1);
     }
 
     /* Initialization helper method */
-    private void initializeRootClade(int numLeaves) {
+    protected void initializeRootClade(int numLeaves) {
         this.leafArraySize = numLeaves;
 
         BitSet rootBitSet = BitSet.newBitSet(leafArraySize);
@@ -198,7 +199,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Helper method; process one tree into this CCD */
-    private void cladifyTree(Tree tree) {
+    protected void cladifyTree(Tree tree) {
         if (storeBaseTrees) {
             this.baseTrees.add(tree);
         } else if (this.baseTrees.isEmpty()) {
@@ -438,6 +439,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         this.random = random;
     }
 
+
     /* -- GENERAL & CCD GRAPH GETTERS -- */
 
     /**
@@ -549,7 +551,14 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return baseTrees.get(0);
     }
 
+    /** @return whether this CCD stores all trees used to construct it */
+    protected boolean storesBaseTrees() {
+        return storeBaseTrees;
+    }
+
+
     /* -- STATE MANAGEMENT - STATE MANAGEMENT -- */
+
     /**
      * Whether cached probability values are out of date.
      */
@@ -596,6 +605,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
             resetCache();
         }
     }
+
 
     /* -- DISTRIBUTION VALUES -- */
 
@@ -654,7 +664,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
         runningIndex = this.getNumberOfLeaves();
         Node root = getVertexBasedOnStrategy(this.rootClade, samplingStrategy, heightStrategy);
-        cleanUpNodeIndices(root);
         Tree tree = new Tree(root);
 
         if (heightStrategy == HeightSettingStrategy.MeanLCAHeight) {
@@ -664,17 +673,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
 
         return tree;
-    }
-
-    private void cleanUpNodeIndices(Node root) {
-        if (root.getNr() != (root.getNodeCount() - 1)) {
-            System.out.println("clean up node indices");
-            // int maxIndex = root.getNr();
-            // List<Node> leaves = root.getAllLeafNodes();
-            // for (Node leaf : leaves) {
-            //     // leaf. TODO
-            // }
-        }
     }
 
     /* Recursive helper method */
@@ -705,8 +703,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
                     samplingStrategy, heightStrategy);
 
             // These are not needed and only make the output newick longer
-//            String id = runningIndex + "";
-//            vertex = new Node(id);
             vertex = new Node();
             vertex.setNr(runningIndex++);
             vertex.addChild(firstChild);
@@ -719,8 +715,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
                 vertex.setHeight(height);
             }
         }
-
-        // vertex.setMetaData("support", clade.getCladeCredibility());
 
         return vertex;
     }
@@ -841,7 +835,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
     }
 
+
     /* -- PROBABILITY - PROBABILITY -- */
+
     @Override
     public double getProbabilityOfTree(Tree tree) {
         resetCacheIfProbabilitiesDirty();
@@ -978,6 +974,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
     }
 
+
     /*-- DISTANCES - DISTANCES -- */
 
     /**
@@ -1112,4 +1109,5 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     public abstract void initialize();
+
 }

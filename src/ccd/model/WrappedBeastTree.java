@@ -101,7 +101,7 @@ public class WrappedBeastTree {
     }
 
     public ArrayList<BitSet> getNontrivialClades() {
-        ArrayList<BitSet> clades = new ArrayList<BitSet>();
+        ArrayList<BitSet> clades = new ArrayList<>();
         for (int i = wrappedTree.getLeafNodeCount(); i < wrappedTree.getNodeCount(); i++) {
             clades.add(cladeOfVertex[i]);
         }
@@ -109,7 +109,7 @@ public class WrappedBeastTree {
     }
 
     public ArrayList<BitSet> getClades() {
-        ArrayList<BitSet> clades = new ArrayList<BitSet>();
+        ArrayList<BitSet> clades = new ArrayList<>();
         for (int i = 0; i < wrappedTree.getNodeCount(); i++) {
             clades.add(cladeOfVertex[i]);
         }

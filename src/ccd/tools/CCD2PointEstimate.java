@@ -6,7 +6,7 @@ import beastfx.app.treeannotator.TreeAnnotator;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 import beastfx.app.treeannotator.services.TopologySettingService;
 import ccd.model.AbstractCCD;
-import ccd.model.CCD1;
+import ccd.model.CCD2;
 import ccd.model.HeightSettingStrategy;
 
 import java.io.IOException;
@@ -14,20 +14,20 @@ import java.io.PrintStream;
 
 
 @Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
-public class CCD1PointEstimate extends PointEstimate implements TopologySettingService {
+public class CCD2PointEstimate extends PointEstimate implements TopologySettingService {
 
     @Override
     public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
             throws IOException {
 
-        progressStream.println("CCD1 MAP tree computation");
+        progressStream.println("CCD2 MAP tree computation");
         progressStream.println("0              25             50             75            100");
         progressStream.println("|--------------|--------------|--------------|--------------|");
 
         treeSet.reset();
         Tree tree = treeSet.next();
         Tree firstTree = tree;
-        CCD1 ccd = new CCD1(tree.getLeafNodeCount(), false);
+        CCD2 ccd = new CCD2(tree.getLeafNodeCount(), false);
 
         int k = treeSet.totalTrees - treeSet.burninCount;
         int percentageDone = 0;
@@ -59,7 +59,7 @@ public class CCD1PointEstimate extends PointEstimate implements TopologySettingS
 
     @Override
     public String getDescription() {
-        return "MAP (CCD1)";
+        return "MAP (CCD2)";
     }
 
     @Override

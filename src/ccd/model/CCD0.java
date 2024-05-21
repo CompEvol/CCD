@@ -192,7 +192,9 @@ public class CCD0 extends AbstractCCD {
         return clade;
     }
 
+
     /* -- STATE MANAGEMENT & INITIALIZATION -- */
+
     /**
      * Whether the CCD graph is expanded and CCPs renormalized.
      */
@@ -254,13 +256,12 @@ public class CCD0 extends AbstractCCD {
      * observed, but not that clade partition.
      */
     private void expand() {
-        // System.out.print("Expand ... ");
         long start = System.currentTimeMillis();
 
         // 1. sort clades
         List<Clade> clades = cladeMapping.values().stream().sorted(Comparator.comparingInt(x -> x.size())).toList();
         if (hasProgressStream()) {
-            progressStream.println("processing " + clades.size() + " clades");
+            progressStream.println("Expanding CCD0: processing " + clades.size() + " clades");
         }
 
         // 2. clade buckets
@@ -504,7 +505,7 @@ public class CCD0 extends AbstractCCD {
     /**
      * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
      * Method only needs to be called when a CCD0 was constructed manually,
-     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
+     * e.g. by the {@link  ccp.algorithms.CCDCombiner}.
      *
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility

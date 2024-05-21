@@ -486,8 +486,7 @@ public class Clade {
                     double entropyFirstChild = partition.getChildClades()[0].getEntropy();
                     double entropySecondChild = partition.getChildClades()[1].getEntropy();
 
-                    runningEntropy -= probability
-                            * (logprobability - entropyFirstChild - entropySecondChild);
+                    runningEntropy -= probability * (logprobability - entropyFirstChild - entropySecondChild);
                 }
 
                 this.entropy = runningEntropy;

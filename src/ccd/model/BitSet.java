@@ -234,13 +234,11 @@ public class BitSet implements Cloneable {
      * @see #size()
      */
     public Object clone() {
-        try {
-            BitSet result = (BitSet) super.clone();
-            result.words = words.clone();
-            return result;
-        } catch (CloneNotSupportedException e) {
-            throw new InternalError(e);
+        BitSet result = new BitSet(this.size());
+        for (int i = 0; i < this.words.length; i++) {
+            result.words[i] = this.words[i];
         }
+        return result;
     }
 
     /**
@@ -320,7 +318,12 @@ public class BitSet implements Cloneable {
      * @since 1.4
      */
     public boolean isEmpty() {
-        return words.length == 0;
+        for (long word : words) {
+            if (word != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
