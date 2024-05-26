@@ -6,6 +6,7 @@ import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeUtils;
 import ccd.model.AbstractCCD;
 import ccd.model.BitSet;
+import ccd.model.CCD2;
 import ccd.model.Clade;
 
 /**
@@ -33,25 +34,27 @@ public abstract class PointEstimate {
      * @param ccd       from which the mapTree is from
      * @return whether the MAP tree passes the sanity check
      */
-    public static boolean equalsFirstTreeCheck(Tree mapTree, Tree firstTree, AbstractCCD ccd) {
+    public static boolean equalsFirstTreeCheck(Tree mapTree, Tree firstTree, AbstractCCD ccd, boolean verbose) {
         if (ccd.getProbabilityOfTree(mapTree) == 1) {
             // there is only one topology, so of course MAP-tree would equal the first tree
             // in fact, a sanity check is not even required
             return true;
         }
 
-        String newick1 = TreeUtils.sortedNewickTopology(mapTree.getRoot(), true).trim();
-        String newick2 = TreeUtils.sortedNewickTopology(firstTree.getRoot(), true).trim();
+        String newick1 = TreeUtils.sortedNewickTopology(mapTree.getRoot(), false).trim();
+        String newick2 = TreeUtils.sortedNewickTopology(firstTree.getRoot(), false).trim();
 
         if (newick1.equals(newick2)) {
-            Log.warning(WARNING_LINE + "\n");
-            Log.warning("The summary tree equals the first tree in the tree set!");
-            Log.warning("Unless you expect to have very informative data,");
-            Log.warning("this strongly suggests burn-in was not removed, and the summary tree is not valid.");
-            Log.warning("In this case, we recommend analyzing the necessary burn-in and rerunning TreeAnnotator.");
-            Log.warning("If you removed enough burn-in and this warning keeps showing,");
-            Log.warning("then this might be just a coincidence or simply reflect your data.");
-            Log.warning("\n" + WARNING_LINE);
+            if (verbose) {
+                Log.warning(WARNING_LINE + "\n");
+                Log.warning("The summary tree equals the first tree in the tree set!");
+                Log.warning("Unless you expect to have very informative data,");
+                Log.warning("this strongly suggests burn-in was not removed, and the summary tree is not valid.");
+                Log.warning("In this case, we recommend analyzing the necessary burn-in and rerunning TreeAnnotator.");
+                Log.warning("If you removed enough burn-in and this warning keeps showing,");
+                Log.warning("then this might be just a coincidence or simply reflect your data.");
+                Log.warning("\n" + WARNING_LINE);
+            }
             return false;
         }
         return true;
@@ -66,37 +69,43 @@ public abstract class PointEstimate {
      * @param ccd     from which the mapTree is from
      * @return whether the MAP tree passes this sanity check
      */
-    public static boolean singlySupportedCheck(Tree mapTree, AbstractCCD ccd) {
+    public static boolean singlySupportedCheck(Tree mapTree, AbstractCCD ccd, boolean verbose) {
         /*- Sanity check: We count how many of the clades in the mapTree
         only have a single observation in the tree set.
         The tree may have been under monophyly constraints, so we also count how
         many clades are under 100% support. */
         int[] counts = new int[2];
-        traverse(mapTree.getRoot(), counts, ccd);
+        if (ccd instanceof CCD2) {
+            CCD2PointEstimate.traverse(mapTree.getRoot().getLeft(), mapTree.getRoot().getRight(), counts, (CCD2) ccd);
+        } else {
+            traverse(mapTree.getRoot(), counts, ccd);
+        }
         int singlySupported = counts[0];
         int monophyletics = counts[1];
         int nodeCount = mapTree.getInternalNodeCount();
 
         if (singlySupported >= 1) {
             double percentage = singlySupported / (double) (nodeCount - monophyletics) * 100;
-            Log.warning(WARNING_LINE + "\n");
-            Log.warning("There are " + singlySupported + " clades supported by only a single tree in the tree set;");
-            Log.warning("more precisely, " + percentage + "% of non-monophyletic non-trivial clades sare supported by only a single tree.");
-            Log.warning("Unless you expect to have very noisy data, this could be due to");
-            Log.warning("not having removed enough burn-in as CCD1 and CCD2 are sensitive to that.");
-            Log.warning("In this case, we recommend analyzing the necessary burn-in and rerunning TreeAnnotator.");
-            Log.warning("If you removed enough burn-in and this warning keeps showing,");
-            Log.warning("then this might be just a coincidence or simply reflect your data.");
-            Log.warning("\n" + WARNING_LINE);
+            if (verbose) {
+                Log.warning(WARNING_LINE + "\n");
+                Log.warning("There are " + singlySupported + " clades supported by only a single tree in the tree set;");
+                Log.warning("more precisely, " + percentage + "% of non-monophyletic non-trivial clades sare supported by only a single tree.");
+                Log.warning("Unless you expect to have very noisy data, this could be due to");
+                Log.warning("not having removed enough burn-in as CCD1 and CCD2 are sensitive to that.");
+                Log.warning("In this case, we recommend analyzing the necessary burn-in and rerunning TreeAnnotator.");
+                Log.warning("If you removed enough burn-in and this warning keeps showing,");
+                Log.warning("then this might be just a coincidence or simply reflect your data.");
+                Log.warning("\n" + WARNING_LINE);
+            }
             return false;
         }
         return true;
     }
 
     /* Recursive helper method to count clades observed only once and monophyletic clades */
-    private static BitSet traverse(Node node, int[] counts, AbstractCCD ccd) {
+    protected static BitSet traverse(Node node, int[] counts, AbstractCCD ccd) {
         if (node.isLeaf()) {
-            BitSet bitset = BitSet.newBitSet(ccd.getNumberOfLeaves());
+            BitSet bitset = BitSet.newBitSet(ccd.getSizeOfLeavesArray());
             bitset.set(node.getNr());
             return bitset;
         } else {

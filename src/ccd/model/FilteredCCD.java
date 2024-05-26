@@ -250,6 +250,11 @@ public class FilteredCCD extends AbstractCCD {
     }
 
     @Override
+    protected double getNumberOfParameters() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public FilteredCCD copy() {
         throw new UnsupportedOperationException("Copying a filtered CCD is by design not supported.");
     }

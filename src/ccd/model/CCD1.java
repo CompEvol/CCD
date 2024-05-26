@@ -3,7 +3,9 @@ package ccd.model;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * This class represents a tree distribution via the conditional clade
@@ -117,5 +119,47 @@ public class CCD1 extends AbstractCCD {
 
         return copy;
     }
-    
+
+    @Override
+    protected double getNumberOfParameters() {
+        return this.getNumberOfCladePartitions();
+    }
+
+    /* -- UNDER DEVELOPMENT -- */
+
+    public List<CladePartition> findAttachmentPointsOfClade(Clade attachingClade) {
+        // TODO WORK IN PRORGESS
+        ArrayList<CladePartition> parentPartitions = new ArrayList<CladePartition>();
+        for (Clade clade : cladeMapping.values()) {
+            if (clade == attachingClade) {
+                continue;
+            } else if (clade.containsClade(attachingClade)) {
+                for (CladePartition partition : clade.getPartitions()) {
+                    if (partition.containsChildClade(attachingClade)) {
+                        parentPartitions.add(partition);
+                    }
+                }
+            }
+        }
+
+        return parentPartitions;
+    }
+
+    private double lostProbability1(Clade clade, Set<Clade> excludedCladePartitions) {
+        double lostProbability = 0.0;
+        for (CladePartition partition : clade.getPartitions()) {
+            Clade firstChild = partition.getChildClades()[0];
+            Clade secondChild = partition.getChildClades()[1];
+
+            if (excludedCladePartitions.contains(partition)) {
+                lostProbability += partition.getCCP();
+            } else {
+                lostProbability += partition.getCCP() *
+                        lostProbability1(firstChild, excludedCladePartitions) *
+                        lostProbability1(secondChild, excludedCladePartitions);
+            }
+        }
+        return lostProbability;
+    }
+
 }

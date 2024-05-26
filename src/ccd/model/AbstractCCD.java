@@ -45,6 +45,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     protected List<Tree> baseTrees;
 
+    /** The trees this CCD is based on (burnin trees removed). */
+    protected TreeSet baseTreeSet;
+
     /**
      * Whether to store the trees used to create this CCD.
      */
@@ -125,6 +128,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     public AbstractCCD(TreeSet treeSet, boolean storeBaseTrees) {
         this(storeBaseTrees);
+        this.baseTreeSet = treeSet;
         this.burnin = 0;
         try {
             treeSet.reset();
@@ -544,6 +548,17 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /**
+     * Set the base TreeSet of this CCD.
+     * Should be the actual TreeSet used to construct,
+     * which might have been done tree by tree for some reason.
+     *
+     * @param baseTreeSet should be the one used to construct the CCD
+     */
+    public void setBaseTreeSet(TreeSet baseTreeSet) {
+        this.baseTreeSet = baseTreeSet;
+    }
+
+    /**
      * @return some tree this CCD is based on, which might be needed to access
      * tree and taxa information
      */
@@ -633,7 +648,38 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return this.rootClade.getNumberOfTopologies();
     }
 
+    /**
+     * Returns the AIC score of this CCD.
+     * The number of parameters depends on the specific CCD.
+     * The log likelihood is computed as the log of the product of the probability of each tree used to construct this CCD;
+     * thus the method requires that this CCD knows the TreeSet it was constructed with.
+     *
+     * @return the AIC score of this CCD
+     * @throws IOException
+     */
+    public double getAICScore() throws IOException {
+        if (this.baseTreeSet == null) {
+            System.err.println("Cannot compute AIC score as CCD not constructed from TreeSet.");
+            return -1;
+        }
+
+        double twoK = 2 * this.getNumberOfParameters();
+        double logL = 0.0;
+
+        baseTreeSet.reset();
+        while (baseTreeSet.hasNext()) {
+            logL += Math.log(getProbabilityOfTree(baseTreeSet.next()));
+        }
+
+        return twoK - 2 * logL;
+    }
+
+    /** @return the number of parameters this CCD model has */
+    abstract protected double getNumberOfParameters();
+
+
     /* -- POINT ESTIMATE / SAMPLING METHODS -- */
+
     @Override
     public Tree sampleTree() {
         return sampleTree(HeightSettingStrategy.None);

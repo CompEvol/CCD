@@ -241,7 +241,7 @@ public class CCD2 extends AbstractCCD {
      * @param siblingInBits sibling in bits; can be null if requesting a leaf clade
      * @return extended clade based on itself and sibling
      */
-    private ExtendedClade getExtendedClade(BitSet cladeInBits, BitSet siblingInBits) {
+    public ExtendedClade getExtendedClade(BitSet cladeInBits, BitSet siblingInBits) {
         if (cladeInBits.cardinality() == 1) {
             // if it is a leaf, then do not consider sibling
             return (ExtendedClade) cladeMapping.get(cladeInBits);
@@ -322,6 +322,16 @@ public class CCD2 extends AbstractCCD {
     @Override
     protected void tidyUpCacheIfDirty() {
         resetCacheIfProbabilitiesDirty();
+    }
+
+    @Override
+    protected void resetCache() {
+        for (Map<BitSet, ExtendedClade> map : extendedCladeMapping.values()) {
+            for (ExtendedClade clade : map.values()) {
+                clade.resetCachedValues();
+            }
+        }
+        super.resetCache();
     }
 
     @Override
@@ -434,6 +444,11 @@ public class CCD2 extends AbstractCCD {
     @Override
     public AbstractCCD copy() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected double getNumberOfParameters() {
+        return this.getNumberOfCladePartitions();
     }
 
 }

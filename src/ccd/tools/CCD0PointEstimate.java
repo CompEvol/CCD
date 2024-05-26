@@ -12,6 +12,7 @@ import ccd.model.HeightSettingStrategy;
 import java.io.IOException;
 import java.io.PrintStream;
 
+
 @Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
 public class CCD0PointEstimate extends PointEstimate implements TopologySettingService {
 

@@ -65,8 +65,8 @@ public class CCD1PointEstimate extends PointEstimate implements TopologySettingS
     @Override
     protected boolean sanityCheck(Tree mapTree, Tree firstTree, AbstractCCD ccd) {
         try {
-            return singlySupportedCheck(mapTree, ccd)
-                    && equalsFirstTreeCheck(mapTree, firstTree, ccd);
+            return singlySupportedCheck(mapTree, ccd, true)
+                    && equalsFirstTreeCheck(mapTree, firstTree, ccd, true);
         } catch (Throwable e) {
             // we do not want sanity checks to ruin the job,
             // so report any issues but otherwise ignore it.
