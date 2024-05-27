@@ -57,7 +57,7 @@ public class CCD2PointEstimate extends PointEstimate implements TopologySettingS
 
     @Override
     public String getServiceName() {
-        return "CCD1";
+        return "CCD2";
     }
 
     @Override

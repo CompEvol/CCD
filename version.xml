@@ -1,10 +1,12 @@
-<package name='CCD' version='0.0.3'>
+<package name='CCD' version='0.0.4'>
 	<depends on='BEAST.base' atleast='2.7.5'/>
 	<depends on='BEAST.app' atleast='2.7.5'/>
 
     <service type="beastfx.app.treeannotator.services.TopologySettingService">
         <provider classname="ccd.tools.CCD0PointEstimate"/>
         <provider classname="ccd.tools.CCD1PointEstimate"/>
+        <provider classname="ccd.tools.CCD2PointEstimate"/>
+        <provider classname="ccd.tools.CCDSelectionPointEstimate"/>
     </service>
 
 </package>

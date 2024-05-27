@@ -99,7 +99,7 @@ public class CCDSelectionPointEstimate extends PointEstimate implements Topology
 
     @Override
     public String getServiceName() {
-        return "CCDx-AIC";
+        return "CCDx";
     }
 
     @Override
