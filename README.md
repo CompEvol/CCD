@@ -30,7 +30,7 @@ Click OK and now CCD should be listed in the package manager (as in the first di
 
 ## Install by hand
 
-* Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.3.zip)
+* Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.4.zip)
 * Create CCD directory inside BEAST package directory
   * for Windows in Users\<YourName>\BEAST\2.X\VSS
   * for Mac in /Users/<YourName>\/Library/Application Support/BEAST/2.X/VSS
