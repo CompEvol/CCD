@@ -9,6 +9,8 @@ import ccd.model.BitSet;
 import ccd.model.CCD2;
 import ccd.model.Clade;
 
+import java.text.DecimalFormat;
+
 /**
  * This is an abstract base class for CCD0 and CCD1 point estimates, sharing sanity checks.
  */
@@ -89,7 +91,8 @@ public abstract class PointEstimate {
             if (verbose) {
                 Log.warning(WARNING_LINE + "\n");
                 Log.warning("There are " + singlySupported + " clades supported by only a single tree in the tree set;");
-                Log.warning("more precisely, " + percentage + "% of non-monophyletic non-trivial clades sare supported by only a single tree.");
+                DecimalFormat df = new DecimalFormat("0.##");
+                Log.warning("more precisely, " + df.format(percentage) + "% of non-monophyletic non-trivial clades sare supported by only a single tree.");
                 Log.warning("Unless you expect to have very noisy data, this could be due to");
                 Log.warning("not having removed enough burn-in as CCD1 and CCD2 are sensitive to that.");
                 Log.warning("In this case, we recommend analyzing the necessary burn-in and rerunning TreeAnnotator.");

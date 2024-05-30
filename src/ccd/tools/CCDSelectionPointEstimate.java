@@ -78,21 +78,19 @@ public class CCDSelectionPointEstimate extends PointEstimate implements Topology
         progressStream.println("CCD0: " + aic0 + " (" + ccd0.getNumberOfClades() + " clades)");
         progressStream.println("CCD1: " + aic1 + " (" + ccd1.getNumberOfCladePartitions() + " clade partitions)");
         progressStream.println("CCD2: " + aic2 + " (" + ccd2.getNumberOfCladePartitions() + " clade partitions)");
-        String winner = "";
         Tree mapTree = null;
         if ((aic0 < aic1) && (aic0 < aic2)) {
-            winner = "0";
+            progressStream.println("Hence, the CCD0 MAP tree is computed.\n");
             mapTree = ccd0.getMAPTree(HeightSettingStrategy.One);
         } else if ((aic1 <= aic0) && (aic1 < aic2)) {
-            winner = "1";
+            progressStream.println("Hence, the CCD1 MAP tree is computed.\n");
             mapTree = ccd1.getMAPTree(HeightSettingStrategy.One);
             sanityCheck(mapTree, firstTree, ccd1);
         } else {
-            winner = "2";
+            progressStream.println("Hence, the CCD2 MAP tree is computed.\n");
             mapTree = ccd2.getMAPTree(HeightSettingStrategy.One);
-            equalsFirstTreeCheck(mapTree, firstTree, ccd2, true);
+            sanityCheck(mapTree, firstTree, ccd2);
         }
-        progressStream.println("Hence, the CCD" + winner + " MAP tree is computed.");
 
         return mapTree;
     }

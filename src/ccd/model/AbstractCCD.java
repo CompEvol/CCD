@@ -731,8 +731,8 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
             vertex = new Node(taxonName);
             vertex.setNr(leafNr);
-            if (heightStrategy == HeightSettingStrategy.One) {
-                vertex.setHeight(0);
+            if (heightStrategy != null) {
+                vertex.setHeight(clade.getMeanOccurredHeight());
             }
         } else {
             CladePartition partition = getPartitionBasedOnStrategy(clade, samplingStrategy);
