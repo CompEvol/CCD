@@ -90,7 +90,7 @@ public class CCDCombiner {
         // 2. compute probability for each clade split
         // 2.1 make sure everything is initialized
         for (AbstractCCD ccd : baseCCDs) {
-            ccd.computeCladeProbabilities();
+            ccd.computeCladeProbabilitiesIfDirty();
         }
 
         // 2.2 loop over clades and then clade partitions
@@ -204,7 +204,7 @@ public class CCDCombiner {
      * Hence, if a clade partition (or even clade) does not appear in one of the base CCDs,
      * then the probability is zero.
      * The returned CCD is tidied up and so does not contain any such clade partitions
-     * or clades without partitions (besides leaves and the root clade); cf. {@link AbstractCCD#tidyUpCCDGraph()}.
+     * or clades without partitions (besides leaves and the root clade); cf. {@link AbstractCCD#tidyUpCCDGraph(boolean)} ()}.
      *
      * <p>
      * <i>Combining:</i> Roughly speaking, for k base CCDs, the combined CCP of a
@@ -268,7 +268,7 @@ public class CCDCombiner {
         // for spiking, we use copies of the base CCDs
         System.out.println("- initialize");
         AbstractCCD[] copiedCCDs = new AbstractCCD[baseCCDs.length];
-        for (int i = 1; i < baseCCDs.length; i++) {
+        for (int i = 0; i < baseCCDs.length; i++) {
             copiedCCDs[i] = baseCCDs[i].copy();
         }
         baseCCDs = copiedCCDs;
@@ -353,7 +353,7 @@ public class CCDCombiner {
             }
         } // handling clades
 
-        if (!combinedCCD.tidyUpCCDGraph()) {
+        if (!combinedCCD.tidyUpCCDGraph(false)) {
             System.err.println("After combining CCDs, we got an empty tree distribution.");
         }
     }

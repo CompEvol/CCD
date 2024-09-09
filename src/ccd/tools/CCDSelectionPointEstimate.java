@@ -78,6 +78,7 @@ public class CCDSelectionPointEstimate extends PointEstimate implements Topology
         progressStream.println("CCD0: " + aic0 + " (" + ccd0.getNumberOfClades() + " clades)");
         progressStream.println("CCD1: " + aic1 + " (" + ccd1.getNumberOfCladePartitions() + " clade partitions)");
         progressStream.println("CCD2: " + aic2 + " (" + ccd2.getNumberOfCladePartitions() + " clade partitions)");
+        String winner = "";
         Tree mapTree = null;
         if ((aic0 < aic1) && (aic0 < aic2)) {
             progressStream.println("Hence, the CCD0 MAP tree is computed.\n");
@@ -97,7 +98,7 @@ public class CCDSelectionPointEstimate extends PointEstimate implements Topology
 
     @Override
     public String getServiceName() {
-        return "CCDx";
+        return "CCDx-AIC";
     }
 
     @Override

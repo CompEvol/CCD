@@ -77,4 +77,29 @@ public class BitSetUtil {
         int firstDifferentBitInOne = mask2.nextSetBit(0);
         return (firstDifferentBitInOne < firstDifferentBitInTwo) ? bitsOne : bitsTwo;
     }
+
+    /**
+     * @param first  bitset
+     * @param second bitset
+     * @return number of bits set to true in both bitsets
+     */
+    public static int overlapSize(BitSet first, BitSet second) {
+        BitSet copy = (BitSet) first.clone();
+        copy.and(second);
+        return copy.cardinality();
+    }
+
+    /**
+     * @param bits to be toggled
+     * @param end  highest index + 1 for toggled bits
+     * @return BitSet with each bit opposite to what it is in the given bits
+     */
+    public static BitSet getToggled(BitSet bits, int end) {
+        int size = bits.size();
+        BitSet mask = BitSet.newBitSet(size);
+        mask.set(1, end);
+        mask.andNot(bits);
+
+        return mask;
+    }
 }

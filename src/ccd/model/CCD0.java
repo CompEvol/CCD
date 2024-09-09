@@ -42,11 +42,19 @@ import java.util.concurrent.RejectedExecutionException;
  */
 public class CCD0 extends AbstractCCD {
 
+    public static final boolean USE_CLADE_PARAMETERS = true;
+
     /** Whether expand should use the monophyletic clade speedup. */
     private boolean useMonophyleticCladeSpeedup = false;
 
     /** Whether expand should run update online (instead of from scratch). */
     private boolean updateOnline = false;
+
+    /**
+     * Whether CCD should be treated as CCD0 and tidying up should reinitialize
+     * (expand + set CCPs) as during construction.
+     */
+    private boolean allowReinitializing = true;
 
     /** Clades added since last expand (for online expand). */
     private List<Clade> newClades = null;
@@ -58,7 +66,7 @@ public class CCD0 extends AbstractCCD {
     private Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
-    private PrintStream progressStream;
+    private PrintStream progressStream = super.out;
 
     /** Progress counted of clades handled in the expand step. */
     private int progressed = 0;
@@ -91,6 +99,18 @@ public class CCD0 extends AbstractCCD {
      * Constructor for a {@link CCD0} based on the given collection of trees
      * (not containing any burnin trees).
      *
+     * @param treeSet an iterable set of trees, which contains no burnin trees,
+     *                whose distribution is approximated by the resulting
+     *                {@link CCD0}
+     */
+    public CCD0(TreeSet treeSet) {
+        this(treeSet, false);
+    }
+
+    /**
+     * Constructor for a {@link CCD0} based on the given collection of trees
+     * (not containing any burnin trees).
+     *
      * @param treeSet        an iterable set of trees, which contains no burnin trees,
      *                       whose distribution is approximated by the resulting
      *                       {@link CCD0}
@@ -98,7 +118,6 @@ public class CCD0 extends AbstractCCD {
      */
     public CCD0(TreeSet treeSet, boolean storeBaseTrees) {
         super(treeSet, storeBaseTrees);
-//        System.out.println("xx");
         initialize();
     }
 
@@ -168,6 +187,11 @@ public class CCD0 extends AbstractCCD {
         this.newClades = new ArrayList<>();
     }
 
+    /** Forbids reinitializing of CCD0 (no expand and resetting CCPs). */
+    public void forbidReinitializing() {
+        this.allowReinitializing = false;
+    }
+
     /**
      * @param progressStream stream used to report on construction
      *                       (adding trees and expand steps)
@@ -217,9 +241,10 @@ public class CCD0 extends AbstractCCD {
     }
 
     @Override
-    protected void checkCladePartitionRemoval(Clade clade, CladePartition partition) {
+    protected boolean removeCladePartitionIfNecessary(Clade clade, CladePartition partition) {
         // nothing to do here for CCD0s
         // since we keep partitions even if they have no occurrence counts
+        return false;
     }
 
     /**
@@ -228,27 +253,32 @@ public class CCD0 extends AbstractCCD {
      */
     @Override
     public void initialize() {
+        if (!allowReinitializing) {
+            return;
+        }
+
         // need to find all clade partitions that could exist but were not
         // observed in base trees
         if (!updateOnline || (cladeBuckets == null)) {
-            // System.out.print("Initializing CCD0 parameters ... ");
+            // out.print("Initializing CCD0 parameters ... ");
             expand();
         } else {
-            // System.out.print("\nExpanding CCD graph (online) ... ");
+            // out.print("\nExpanding CCD graph (online) ... ");
             expandOnline();
         }
 
         // then need to set clade partition probabilities
         // which normalizes the product of clade probabilities
-        // System.out.print("setting probabilities ... ");
+        // out.print("setting probabilities ... ");
         setPartitionProbabilities(this.rootClade);
 
-        // System.out.println(" ...done.");
+        // out.println(" ...done.");
         if (updateOnline) {
             newClades.clear();
         }
         this.dirtyStructure = false;
         super.setCacheAsDirty();
+        this.probabilitiesDirty = false;
     }
 
     /**
@@ -256,11 +286,11 @@ public class CCD0 extends AbstractCCD {
      * observed, but not that clade partition.
      */
     private void expand() {
-        long start = System.currentTimeMillis();
+        // long start = System.currentTimeMillis();
 
         // 1. sort clades
         List<Clade> clades = cladeMapping.values().stream().sorted(Comparator.comparingInt(x -> x.size())).toList();
-        if (hasProgressStream()) {
+        if (verbose) {
             progressStream.println("Expanding CCD0: processing " + clades.size() + " clades");
         }
 
@@ -285,7 +315,9 @@ public class CCD0 extends AbstractCCD {
             findChildPartitions(clades);
         } else {
             try {
-                System.out.println("Running expand step with " + threadCount + " threads.");
+                if (verbose) {
+                    out.println("Running expand step with " + threadCount + " threads.");
+                }
                 countDown = new CountDownLatch(threadCount);
                 ExecutorService exec = Executors.newFixedThreadPool(threadCount);
                 int end = clades.size();
@@ -301,8 +333,9 @@ public class CCD0 extends AbstractCCD {
             done.clear();
         }
 
-        // System.out.println("done.");
-        long end = System.currentTimeMillis();
+        if (verbose) {
+            out.println("... done.");
+        }
         // Log.warning("Expanded CCD0 in " + (end - start) / 1000 + " seconds.");
         progressStream = null;
     }
@@ -312,7 +345,7 @@ public class CCD0 extends AbstractCCD {
      * observed, but not that clade partition.
      */
     private void expandOnline() {
-        // System.out.println("expand online (num trees total = " + this.getNumberOfBaseTrees() + ")");
+        // out.println("expand online (num trees total = " + this.getNumberOfBaseTrees() + ")");
 
         // 0. take out clades that have no occurrences left
         // and do nothing if no new clades remain
@@ -352,9 +385,9 @@ public class CCD0 extends AbstractCCD {
         int i = 0;
         for (Clade parent : parentClades) {
             findChildPartitionsOf(parent, helperBits);
-            if (progressStream != null) {
-                while (progressed < i * 61 / parentClades.size()) {
-                    progressStream.print("*");
+            if (verbose) {
+                while (progressed < (i * 61 / parentClades.size())) {
+                    progressStream.print(".");
                     progressed++;
                 }
             }
@@ -466,7 +499,7 @@ public class CCD0 extends AbstractCCD {
     }
 
     /* Thread worker for embarssingly parallezing parts of the expand step */
-    class ExpandWorker implements Runnable {
+    class ExpandWorker implements java.lang.Runnable {
         private List<Clade> clades;
         private int start;
         private int end;
@@ -487,7 +520,7 @@ public class CCD0 extends AbstractCCD {
                     i += threadCount;
 
                     if (progressStream != null) {
-                        while (progressed < i * 61 / clades.size()) {
+                        while (progressed < (i * 61 / clades.size())) {
                             progressStream.print("*");
                             progressed++;
                         }
@@ -505,18 +538,33 @@ public class CCD0 extends AbstractCCD {
     /**
      * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
      * Method only needs to be called when a CCD0 was constructed manually,
-     * e.g. by the {@link  ccp.algorithms.CCDCombiner}.
+     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
      *
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility
      */
     public static double setPartitionProbabilities(Clade clade) {
+        return setPartitionProbabilities(clade, !USE_CLADE_PARAMETERS);
+    }
+
+    /**
+     * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
+     * Method only needs to be called when a CCD0 was constructed manually,
+     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
+     *
+     * @param clade              for which the clade partition probabilities are computed
+     * @param useCladeParameters whether to use the clade parameters or the clade credibilities
+     * @return the sum of this clade's partitions probabilities times its own credibility
+     */
+    public static double setPartitionProbabilities(Clade clade, boolean useCladeParameters) {
         if (clade.getSumCladeCredibilities() > 0) {
             return clade.getSumCladeCredibilities();
         }
+        double cladeValue = useCladeParameters ? clade.getCladeParameter() : clade.getCladeCredibility();
 
         if (clade.isLeaf()) {
             // a leaf has no partition, sum of probabilities is 1
+            clade.setSumCladeCredibilities(1);
             return 1.0;
         } else if (clade.isCherry()) {
             // a cherry has only one partition
@@ -524,9 +572,8 @@ public class CCD0 extends AbstractCCD {
                 throw new AssertionError("Cherry should contain a clade split.");
             }
             clade.partitions.get(0).setCCP(1);
-            clade.setSumCladeCredibilities(clade.getCladeCredibility());
-            return clade.getCladeCredibility();
-
+            clade.setSumCladeCredibilities(cladeValue);
+            return cladeValue;
         } else {
             // other might have more partitions
             double sumSubtreeProbabilities = 0.0;
@@ -536,8 +583,8 @@ public class CCD0 extends AbstractCCD {
             int i = 0;
             for (CladePartition partition : clade.getPartitions()) {
                 sumPartitionSubtreeProbabilities[i] =
-                        setPartitionProbabilities(partition.getChildClades()[0])
-                                * setPartitionProbabilities(partition.getChildClades()[1]);
+                        setPartitionProbabilities(partition.getChildClades()[0], useCladeParameters)
+                                * setPartitionProbabilities(partition.getChildClades()[1], useCladeParameters);
                 sumSubtreeProbabilities += sumPartitionSubtreeProbabilities[i];
                 i++;
             }
@@ -547,12 +594,20 @@ public class CCD0 extends AbstractCCD {
                 double probability;
                 if (sumSubtreeProbabilities == 0) {
                     System.err.println("Sum of subtree probabilities for  partition is 0, which could result from an underflow;" +
-                            "maybe not enough burnin used?");
+                            " maybe not enough burnin used?");
                     System.err.println("- parent clade: " + clade);
                     System.err.println("- partition: " + partition);
+                    System.err.println("- use clade params? " + useCladeParameters);
                     probability = 0;
+                    throw new AssertionError();
                 } else {
                     probability = sumPartitionSubtreeProbabilities[i] / sumSubtreeProbabilities;
+                }
+                if (Double.isNaN(probability)) {
+                    out.println("clade = " + clade);
+                    out.println("partition = " + partition);
+                    out.println("sumPartitionSubtreeProbabilities = " + sumPartitionSubtreeProbabilities[i]);
+                    out.println("sumSubtreeProbabilities = " + sumSubtreeProbabilities);
                 }
                 partition.setCCP(probability);
                 i++;
@@ -560,7 +615,7 @@ public class CCD0 extends AbstractCCD {
 
             // combined with probability of clade, we get sum of all subtree
             // probabilities
-            double sumCladeCredibilities = sumSubtreeProbabilities * clade.getCladeCredibility();
+            double sumCladeCredibilities = sumSubtreeProbabilities * cladeValue;
             clade.setSumCladeCredibilities(sumCladeCredibilities);
             return sumCladeCredibilities;
         }
@@ -603,6 +658,7 @@ public class CCD0 extends AbstractCCD {
     public AbstractCCD copy() {
         CCD0 copy = new CCD0(this.getSizeOfLeavesArray(), false);
         copy.baseTrees.add(this.getSomeBaseTree());
+        copy.numBaseTrees = this.getNumberOfBaseTrees();
 
         AbstractCCD.buildCopy(this, copy);
 
@@ -626,5 +682,8 @@ public class CCD0 extends AbstractCCD {
     protected double getNumberOfParameters() {
         return this.getNumberOfClades();
     }
+
+
+    /* -- WORK IN PROGRESS - OPTIMIZATION & PRINTING -- */
 
 }

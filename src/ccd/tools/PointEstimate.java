@@ -62,7 +62,6 @@ public abstract class PointEstimate {
         return true;
     }
 
-
     /**
      * A sanity check producing warnings if there are any clades in the MAP tree
      * that are only supported by a single tree.

@@ -11,6 +11,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -27,7 +28,7 @@ public class SampleDistribution implements ITreeDistribution {
     private TreeSet[] treeSets;
 
     /** Different trees (topologies) with counts of this distribution. */
-    private ArrayList<WrappedBeastTree> trees = new ArrayList<WrappedBeastTree>(100);
+    private List<WrappedBeastTree> trees = new ArrayList<>(100);
 
     private HashMap<String, WrappedBeastTree> treeMap = new HashMap<>(100);
 
@@ -56,6 +57,7 @@ public class SampleDistribution implements ITreeDistribution {
      * @param treeSet burnin assumed to be set
      */
     public SampleDistribution(TreeSet treeSet) {
+        this.treeSets = new TreeSet[1];
         this.treeSets[0] = treeSet;
         this.numBaseTrees = treeSet.totalTrees - treeSet.burninCount;
 
@@ -175,8 +177,36 @@ public class SampleDistribution implements ITreeDistribution {
         }
     }
 
+    /**
+     * Computes and returns the credible set of this distribution for the given credible level.
+     *
+     * @param credibleLevel how much probability to keep (e.g. 0.95)
+     * @return a SampleDistribution that represents the credible set of this one
+     */
+    public SampleDistribution getCredibilitySet(final double credibleLevel) {
+        double sum = 0;
+        double numTrees = this.numBaseTrees;
+        int totalCount = 0;
+        SampleDistribution credi = new SampleDistribution(this.numLeaves);
+
+        for (WrappedBeastTree tree : trees) {
+            credi.trees.add(tree);
+            totalCount += tree.getCount();
+
+            sum += tree.getCount() / numTrees;
+            if (sum >= credibleLevel) {
+                break;
+            }
+        }
+
+        credi.initializeClades();
+        credi.numBaseTrees = totalCount;
+
+        return credi;
+    }
+
     /** @return trees of this distribution, sorted by decreasing probability */
-    public ArrayList<WrappedBeastTree> getTrees() {
+    public List<WrappedBeastTree> getTrees() {
         return trees;
     }
 
@@ -343,6 +373,109 @@ public class SampleDistribution implements ITreeDistribution {
         }
 
         return clade.getNumberOfOccurrences() / (double) this.getNumberOfBaseTrees();
+    }
+
+    /** @return the entropy of this tree distribution */
+    public double getEntropy() {
+        double entropy = 0;
+
+        for (WrappedBeastTree tree : trees) {
+            double count = tree.getCount();
+            double p = count / numBaseTrees;
+            entropy -= p * Math.log(p);
+        }
+
+        return entropy;
+    }
+
+    /**
+     * Computes and returns the Fair Proportion Diversity Index of the taxa in this sample distribution.
+     *
+     * @return Fair Proportion Diversity Index of the taxa in this sample distribution
+     */
+    public double[] getFairProportionIndex() {
+        int numLeaves = trees.get(0).getWrappedTree().getLeafNodeCount();
+        double[] index = new double[numLeaves];
+        double numTrees = (double) this.numBaseTrees;
+
+        for (WrappedBeastTree wrappedTree : trees) {
+            Tree tree = wrappedTree.getWrappedTree();
+            double[] currentIndex = getFairProportionIndex(tree);
+            double treeWeight = wrappedTree.getCount() / numTrees;
+
+            for (int i = 0; i < index.length; i++) {
+                index[i] += currentIndex[i] * treeWeight;
+            }
+        }
+
+        return index;
+    }
+
+    /**
+     * Computes and returns the Fair Proportion Diversity Index of the taxa for the given tree.
+     *
+     * @param tree for which FP is computed
+     * @return the FP values of the taxa for the given tree
+     */
+    public static double[] getFairProportionIndex(Tree tree) {
+        int numLeaves = tree.getLeafNodeCount();
+        double[] index = new double[numLeaves];
+
+        getFairProportionIndex(tree.getRoot(), numLeaves, index);
+
+        return index;
+    }
+
+    /* Recursive helper method */
+    private static BitSet getFairProportionIndex(Node vertex, int numLeaves, double[] index) {
+        if (vertex.isLeaf()) {
+            BitSet bitset = BitSet.newBitSet(numLeaves);
+            bitset.set(vertex.getNr());
+            return bitset;
+        }
+
+        BitSet leftBits = getFairProportionIndex(vertex.getLeft(), numLeaves, index);
+        double branchLength = vertex.getHeight() - vertex.getLeft().getHeight();
+        int size = leftBits.cardinality();
+        double diversity = branchLength / size;
+
+        if (branchLength < 0) {
+            System.out.println("branchLength = " + branchLength);
+            System.out.println("size = " + size);
+            System.out.println("diversity = " + diversity);
+            System.out.println("parent = " + vertex);
+            System.out.println("childL = " + vertex.getLeft());
+            throw new AssertionError("Negative branch length.");
+        }
+
+        int i = leftBits.nextSetBit(0);
+        while (i != -1) {
+            index[i] += diversity;
+            i = leftBits.nextSetBit(i + 1);
+        }
+
+        BitSet rightBits = getFairProportionIndex(vertex.getRight(), numLeaves, index);
+        branchLength = vertex.getHeight() - vertex.getRight().getHeight();
+        size = rightBits.cardinality();
+        diversity = branchLength / size;
+
+        i = rightBits.nextSetBit(0);
+        while (i != -1) {
+            index[i] += diversity;
+            i = rightBits.nextSetBit(i + 1);
+        }
+
+        if (branchLength < 0) {
+            System.out.println("branchLength = " + branchLength);
+            System.out.println("size = " + size);
+            System.out.println("diversity = " + diversity);
+            System.out.println("parent = " + vertex);
+            System.out.println("childR = " + vertex.getRight());
+        }
+
+
+        leftBits.or(rightBits);
+        return leftBits;
     }
 
     /** Set the Random of this distribution. */

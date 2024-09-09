@@ -121,6 +121,23 @@ public class BitSet implements Cloneable {
     }
 
     /**
+     * Sets the bit at the specified index to {@code false}.
+     *
+     * @param bitIndex a bit index
+     * @throws IndexOutOfBoundsException if the specified index is negative
+     */
+    public void clear(int bitIndex) {
+        if (bitIndex < 0)
+            throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+
+        int wordIndex = wordIndex(bitIndex);
+        if (wordIndex >= words.length)
+            return;
+
+        words[wordIndex] &= ~(1L << bitIndex);
+    }
+
+    /**
      * Returns the value of the bit with the specified index. The value
      * is {@code true} if the bit with the index {@code bitIndex}
      * is currently set in this {@code BitSet}; otherwise, the result
@@ -392,7 +409,7 @@ public class BitSet implements Cloneable {
     /**
      * Given a bit index, return word index containing it.
      */
-    private static int wordIndex(int bitIndex) {
+    static int wordIndex(int bitIndex) {
         return bitIndex >> ADDRESS_BITS_PER_WORD;
     }
 

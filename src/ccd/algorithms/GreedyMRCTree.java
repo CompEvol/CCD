@@ -33,19 +33,18 @@ public class GreedyMRCTree {
     public static Tree constructTree(AbstractCCD ccd, HeightSettingStrategy heightStrategy) {
         // we need all clades with counts; here counts are stored in the clades
         // as number of occurrences
-        ArrayList<Clade> clades = new ArrayList<Clade>(ccd.getNumberOfClades());
+        ArrayList<Clade> clades = new ArrayList<>(ccd.getNumberOfClades());
         clades.addAll(ccd.getClades());
         // System.out.println("num base clades: " + clades.size());
 
-        // we then first find a set of compatible clades, that will form the
-        // tree
+        // we then first find a set of compatible clades, that will form the tree
         ArrayList<Clade> compatibleClades = computeCompatibleClades(clades);
         // System.out.println("num comp. clades: " + compatibleClades.size());
 
         // sort clades by increasing size, to build tree bottom-up
         List<Clade> tempClades = compatibleClades.stream()
                 .sorted((x, y) -> Integer.compare(x.size(), y.size())).toList();
-        ArrayList<Clade> vertexClades = new ArrayList<Clade>(tempClades.size() + 1);
+        ArrayList<Clade> vertexClades = new ArrayList<>(tempClades.size() + 1);
         vertexClades.addAll(tempClades);
         vertexClades.add(ccd.getRootClade());
 
@@ -142,9 +141,8 @@ public class GreedyMRCTree {
         for (Clade testedClade : sortedClades) {
             boolean compatible = true;
             for (Clade clade : compatibleClades) {
-                // two clades are compatible if one is contained in the other or
-                // they are disjoint; so they are not compatible, if they
-                // intersect properly
+                // two clades are compatible if one is contained in the other or they are disjoint;
+                // so they are not compatible, if they intersect properly
                 if (BitSetUtil.intersectProperly(clade.getCladeInBits(),
                         testedClade.getCladeInBits())) {
                     compatible = false;

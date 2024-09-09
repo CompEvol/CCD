@@ -7,5 +7,8 @@
         <provider classname="ccd.tools.CCD1PointEstimate"/>
         <provider classname="ccd.tools.CCD2PointEstimate"/>
     </service>
+	
+	<packageapp description="Skeleton Analysis" class="ccd.tools.SkeletonAnalysis" args=""/> 
+	<packageapp description="Rogue Analysis" class="ccd.tools.RogueAnalysis" args=""/>
 
 </package>

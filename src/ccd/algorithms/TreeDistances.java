@@ -17,10 +17,11 @@ public class TreeDistances {
     /**
      * Compute the Robinsons-Fould (RF) distance (divided by 2) of the two given
      * trees, that is, the number of clades in the first tree that are not in
-     * the second tree.
+     * the second tree. Assumption is that the two trees are binary otherwise
+     * the current implementation is not symmetric.
      *
-     * @param first
-     * @param second
+     * @param first  tree, assumed to be binary
+     * @param second tree, assumed to be binary
      * @return the RF distance (divided by 2) for the two given trees
      */
     public static int robinsonsFouldDistance(WrappedBeastTree first, WrappedBeastTree second) {

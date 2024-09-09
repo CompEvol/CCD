@@ -92,6 +92,11 @@ public class AttachingFilteredCCD extends FilteredCCD {
     }
 
     @Override
+    public double getEntropy() {
+        return super.getEntropyLewis();
+    }
+
+    @Override
     public String toString() {
         return "Attaching" + super.toString();
     }
