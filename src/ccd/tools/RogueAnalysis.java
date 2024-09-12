@@ -9,6 +9,7 @@ import beast.base.evolution.tree.Tree;
 import beast.base.inference.Runnable;
 import beastfx.app.tools.Application;
 import beastfx.app.treeannotator.TreeAnnotator.MemoryFriendlyTreeSet;
+import beastfx.app.util.OutFile;
 import beastfx.app.util.TreeFile;
 import ccd.algorithms.RogueDetection;
 import ccd.model.AbstractCCD;
@@ -38,12 +39,19 @@ public class RogueAnalysis extends Runnable {
     final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to analyse", 10);
     final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to analyse", 0.1);
     // - for MAP tree
-    final public Input<String> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
+    enum hss {CA, MH, ONE};
+    final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
-            HeightSettingStrategy.CommonAncestorHeights.toString());
+            hss.CA,
+            hss.values());
+
+//    final public Input<HeightSettingStrategy> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
+//            "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
+//            HeightSettingStrategy.CommonAncestorHeights,
+//            HeightSettingStrategy.values());
 
     // output
-    final public Input<String> outputInput = new Input<>("out", "file name for output (without file ending)," +
+    final public Input<OutFile> outputInput = new Input<>("out", "file name for output (without file ending)," +
             "will be used with '.csv' for rogue score and '.trees' for annotated MAP trees");
     final public Input<String> separatorInput = new Input<>("separator",
             "separator used in csv; default is tab", SEPARATOR);
@@ -68,6 +76,7 @@ public class RogueAnalysis extends Runnable {
         // computation
         System.out.println("> computing rogue scores with...");
         int maxCladeSize = Math.max(maxCladeSizeInput.get(), 1);
+        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves()-1);
         double minProbability = minProbabilityInput.get();
         System.out.println("    max clade size: " + maxCladeSize);
         System.out.println("    min clade prob: " + minProbability);
@@ -104,7 +113,7 @@ public class RogueAnalysis extends Runnable {
         System.out.print("> writing annotated CCD MAP tree to file ");
         infoOutputFileName = outputInput.get() + ".trees";
         System.out.println(infoOutputFileName);
-        HeightSettingStrategy hss = HeightSettingStrategy.fromName(heightSettingStrategyInput.get());
+        HeightSettingStrategy hss = HeightSettingStrategy.fromName(heightSettingStrategyInput.get().toString());
         Tree tree = ccd.getMAPTree(hss);
         Map<Clade, Node> map = ccd.getCladeToNodeMap(tree);
         for (Clade clade : ccd.getClades()) {

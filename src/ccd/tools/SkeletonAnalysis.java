@@ -51,10 +51,12 @@ public class SkeletonAnalysis extends Runnable {
     final public Input<Double> terminationThresholdInput = new Input<>("terminationThreshold",
             "threshold for termination strategy (if not default or exhaustive strategy)");
     // - for MAP tree
-    final public Input<String> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
+    enum hss {CA,  MH, ONE};
+    final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
-            HeightSettingStrategy.CommonAncestorHeights.toString());
-    final public Input<File> excludeInput = new Input<>("exclude", "file name of text file containing taxa to exclude from filtering" +
+            hss.CA,
+            hss.values());
+    final public Input<OutFile> excludeInput = new Input<>("exclude", "file name of text file containing taxa to exclude from filtering" +
             " -- can be comma, tab or newline delimited.");
 
     // output
@@ -91,6 +93,7 @@ public class SkeletonAnalysis extends Runnable {
 
         // run analysis
         int maxCladeSize = Math.max(maxCladeSizeInput.get(), 1);
+        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves()-1);
         double minProbability = minProbabilityInput.get();
         ArrayList<AbstractCCD> ccds = RogueDetection.detectRoguesWhileImproving(ccd,
                 maxCladeSize, strategyInput.get(), terminationStrategy, minProbability, true);
@@ -111,7 +114,7 @@ public class SkeletonAnalysis extends Runnable {
         // annotate MAP tree
         System.out.println("\n> annotate CCD MAP tree");
         FilteredCCD lastCCD = (FilteredCCD) ccds.get(ccds.size() - 1);
-        HeightSettingStrategy hss = HeightSettingStrategy.fromName(heightSettingStrategyInput.get());
+        HeightSettingStrategy hss = HeightSettingStrategy.fromName(heightSettingStrategyInput.get().toString());
         Tree tree = lastCCD.getMAPTree(hss);
         Set<BitSet> rogues = RogueDetection.extractRogues(ccds);
         RogueDetection.annotateRoguePlacements(ccd, lastCCD, rogues, tree);

@@ -139,11 +139,12 @@ public class RogueDetection {
 
         @Override
         public String toString() {
-            if (this == Exhaustive) {
-                return this.name;
-            } else {
-                return this.name + " (" + this.threshold + ")";
-            }
+            return this.name;
+//            if (this == Exhaustive) {
+//                return this.name;
+//            } else {
+//                return this.name + " (" + this.threshold + ")";
+//            }
         }
     }
 
