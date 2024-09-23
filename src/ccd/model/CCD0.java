@@ -66,7 +66,7 @@ public class CCD0 extends AbstractCCD {
     private Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
-    private PrintStream progressStream = super.out;
+    private PrintStream progressStream;
 
     /** Progress counted of clades handled in the expand step. */
     private int progressed = 0;
@@ -224,6 +224,8 @@ public class CCD0 extends AbstractCCD {
      */
     private boolean dirtyStructure = true;
 
+    private boolean lostClades = false;
+
     @Override
     public void setCacheAsDirty() {
         super.setCacheAsDirty();
@@ -254,6 +256,7 @@ public class CCD0 extends AbstractCCD {
     @Override
     public void initialize() {
         if (!allowReinitializing) {
+            // this.dirtyStructure = false;
             return;
         }
 
@@ -271,6 +274,12 @@ public class CCD0 extends AbstractCCD {
         // which normalizes the product of clade probabilities
         // out.print("setting probabilities ... ");
         setPartitionProbabilities(this.rootClade);
+        if (lostClades && !updateOnline) {
+            System.err.println("Some probabilities are too low, causing underflow.\n" +
+                    "As a result downstream values might become NaN.\n" +
+                    "Consider using CCD1 or more burnin.");
+            lostClades = false;
+        }
 
         // out.println(" ...done.");
         if (updateOnline) {
@@ -290,7 +299,7 @@ public class CCD0 extends AbstractCCD {
 
         // 1. sort clades
         List<Clade> clades = cladeMapping.values().stream().sorted(Comparator.comparingInt(x -> x.size())).toList();
-        if (verbose) {
+        if ((progressStream != null) && verbose) {
             progressStream.println("Expanding CCD0: processing " + clades.size() + " clades");
         }
 
@@ -315,8 +324,8 @@ public class CCD0 extends AbstractCCD {
             findChildPartitions(clades);
         } else {
             try {
-                if (verbose) {
-                    out.println("Running expand step with " + threadCount + " threads.");
+                if ((progressStream != null) && verbose) {
+                    progressStream.println("Running expand step with " + threadCount + " threads.");
                 }
                 countDown = new CountDownLatch(threadCount);
                 ExecutorService exec = Executors.newFixedThreadPool(threadCount);
@@ -333,8 +342,8 @@ public class CCD0 extends AbstractCCD {
             done.clear();
         }
 
-        if (verbose) {
-            out.println("... done.");
+        if ((progressStream != null) && verbose) {
+            progressStream.println("... done.");
         }
         // Log.warning("Expanded CCD0 in " + (end - start) / 1000 + " seconds.");
         progressStream = null;
@@ -385,7 +394,7 @@ public class CCD0 extends AbstractCCD {
         int i = 0;
         for (Clade parent : parentClades) {
             findChildPartitionsOf(parent, helperBits);
-            if (verbose) {
+            if ((progressStream != null) && verbose) {
                 while (progressed < (i * 61 / parentClades.size())) {
                     progressStream.print(".");
                     progressed++;
@@ -394,7 +403,7 @@ public class CCD0 extends AbstractCCD {
             i++;
         }
 
-        if (progressStream != null) {
+        if ((progressStream != null) && verbose) {
             progressStream.println();
         }
     }
@@ -538,7 +547,7 @@ public class CCD0 extends AbstractCCD {
     /**
      * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
      * Method only needs to be called when a CCD0 was constructed manually,
-     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
+     * e.g. by the {@link  ccp.algorithms.CCDCombiner}.
      *
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility
@@ -550,7 +559,7 @@ public class CCD0 extends AbstractCCD {
     /**
      * Recursively computes, sets, and returns the probabilities of all clade partitions based on the clade credibilities.
      * Method only needs to be called when a CCD0 was constructed manually,
-     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
+     * e.g. by the {@link  ccp.algorithms.CCDCombiner}.
      *
      * @param clade              for which the clade partition probabilities are computed
      * @param useCladeParameters whether to use the clade parameters or the clade credibilities
@@ -561,6 +570,7 @@ public class CCD0 extends AbstractCCD {
             return clade.getSumCladeCredibilities();
         }
         double cladeValue = useCladeParameters ? clade.getCladeParameter() : clade.getCladeCredibility();
+        ArrayList<CladePartition> lostPartitions = new ArrayList<>(2);
 
         if (clade.isLeaf()) {
             // a leaf has no partition, sum of probabilities is 1
@@ -588,33 +598,93 @@ public class CCD0 extends AbstractCCD {
                 sumSubtreeProbabilities += sumPartitionSubtreeProbabilities[i];
                 i++;
             }
+
             // ... and then normalize
-            i = 0;
-            for (CladePartition partition : clade.getPartitions()) {
-                double probability;
-                if (sumSubtreeProbabilities == 0) {
-                    System.err.println("Sum of subtree probabilities for  partition is 0, which could result from an underflow;" +
-                            " maybe not enough burnin used?");
-                    System.err.println("- parent clade: " + clade);
-                    System.err.println("- partition: " + partition);
-                    System.err.println("- use clade params? " + useCladeParameters);
-                    probability = 0;
-                    throw new AssertionError();
-                } else {
-                    probability = sumPartitionSubtreeProbabilities[i] / sumSubtreeProbabilities;
+            if (sumSubtreeProbabilities == 0) {
+                // probability of this subtree is so small, that we have an underflow problem;
+                // we can try to use log transformed probabilities to set CCPs
+                // but the probability of the clade will still become zero
+
+                // try log-sum-exp trick
+                double logMax = Double.NEGATIVE_INFINITY;
+                double[] logProbs = new double[clade.getPartitions().size()];
+                i = 0;
+                for (CladePartition partition : clade.getPartitions()) {
+                    double left = partition.getChildClades()[0].getSumCladeCredibilities();
+                    double right = partition.getChildClades()[1].getSumCladeCredibilities();
+                    logProbs[i] = Math.log(left) + Math.log(right);
+                    logMax = Math.max(logProbs[i], logMax);
+
+                    // if (Double.isNaN(logProbs[i]) || Double.isInfinite(logProbs[i])) {
+                    //     out.println("XXXXXXXXX");
+                    //     out.println("logProbs[i] = " + logProbs[i]);
+                    //     out.println("left = " + left);
+                    //     out.println("log left = " + Math.log(left));
+                    //     out.println("right = " + left);
+                    //     out.println("log right = " + Math.log(right));
+                    // }
+
+                    i++;
                 }
-                if (Double.isNaN(probability)) {
-                    out.println("clade = " + clade);
-                    out.println("partition = " + partition);
-                    out.println("sumPartitionSubtreeProbabilities = " + sumPartitionSubtreeProbabilities[i]);
-                    out.println("sumSubtreeProbabilities = " + sumSubtreeProbabilities);
+
+                // log sum = log pMax - log( sum exp(log pi - logMax))
+                double intermSum = 0;
+                for (int j = 0; j < logProbs.length; j++) {
+                    if (Double.isFinite(logProbs[j])) {
+                        intermSum += Math.exp(logProbs[j] - logMax);
+                    }
                 }
-                partition.setCCP(probability);
-                i++;
+                double logSum = logMax - Math.log(intermSum);
+
+                // normalizing with normalized log pi = log pi - log sum
+                i = 0;
+                double pSum = 0;
+                for (CladePartition partition : clade.getPartitions()) {
+                    if (!Double.isFinite(logProbs[i])) {
+                        partition.setCCP(0);
+                        lostPartitions.add(partition);
+                    } else {
+                        double logProbability = logProbs[i] - logSum;
+                        double probability = Math.exp(logProbability);
+                        pSum += probability;
+
+                        if (Double.isNaN(probability)) {
+                            out.println("NaN probability = " + probability);
+                            out.println("logProbability = " + logProbability);
+                            out.println("logProbs[i] = " + logProbs[i]);
+                            out.println("logSum = " + logSum);
+                        }
+
+                        partition.setCCP(probability);
+                    }
+                    i++;
+                }
+
+                // if still some partition has zero probability,
+                // we need get rid of it
+                for (CladePartition partition : lostPartitions) {
+                    clade.removePartition(partition);
+                }
+                lostPartitions.clear();
+                if (clade.getNumberOfPartitions() == 0) {
+                    ((CCD0) clade.getCCD()).lostClades = true;
+                }
+            } else {
+                i = 0;
+                for (CladePartition partition : clade.getPartitions()) {
+                    double probability = sumPartitionSubtreeProbabilities[i] / sumSubtreeProbabilities;
+                    if (Double.isNaN(probability)) {
+                        out.println("clade = " + clade);
+                        out.println("partition = " + partition);
+                        out.println("sumPartitionSubtreeProbabilities = " + sumPartitionSubtreeProbabilities[i]);
+                        out.println("sumSubtreeProbabilities = " + sumSubtreeProbabilities);
+                    }
+                    partition.setCCP(probability);
+                    i++;
+                }
             }
 
-            // combined with probability of clade, we get sum of all subtree
-            // probabilities
+            // combined with probability of clade, we get sum of all subtree probabilities
             double sumCladeCredibilities = sumSubtreeProbabilities * cladeValue;
             clade.setSumCladeCredibilities(sumCladeCredibilities);
             return sumCladeCredibilities;

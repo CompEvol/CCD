@@ -38,17 +38,19 @@ public class RogueAnalysis extends Runnable {
     final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0 or CCD1", "CCD0");
     final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to analyse", 10);
     final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to analyse", 0.1);
+
     // - for MAP tree
-    enum hss {CA, MH, ONE};
+    enum hss {CA, MH, ONE}
+
+    ;
     final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
             hss.values());
-
-//    final public Input<HeightSettingStrategy> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
-//            "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
-//            HeightSettingStrategy.CommonAncestorHeights,
-//            HeightSettingStrategy.values());
+    //    final public Input<HeightSettingStrategy> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
+    //            "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
+    //            HeightSettingStrategy.CommonAncestorHeights,
+    //            HeightSettingStrategy.values());
 
     // output
     final public Input<OutFile> outputInput = new Input<>("out", "file name for output (without file ending)," +
@@ -76,7 +78,7 @@ public class RogueAnalysis extends Runnable {
         // computation
         System.out.println("> computing rogue scores with...");
         int maxCladeSize = Math.max(maxCladeSizeInput.get(), 1);
-        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves()-1);
+        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves() - 1);
         double minProbability = minProbabilityInput.get();
         System.out.println("    max clade size: " + maxCladeSize);
         System.out.println("    min clade prob: " + minProbability);

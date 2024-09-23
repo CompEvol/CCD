@@ -16,9 +16,8 @@ import java.io.IOException;
  * to reduce redundant code.
  */
 public class CCDToolUtil {
-
     /**
-     * Get MemoryFriendlyTreeSet from given filename and given burnin inputs.
+     * Get MemoryFriendlyTreeSet from given filename input and given burnin inputs.
      *
      * @param treeInput             trees file input
      * @param burnInPercentageInput burnin input checked to be in bounds, altered otherwise
@@ -26,12 +25,24 @@ public class CCDToolUtil {
      * @throws IOException ...
      */
     public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(Input<TreeFile> treeInput, Input<Integer> burnInPercentageInput) throws IOException {
+        return getTreeSet(treeInput.get().getPath(), burnInPercentageInput);
+    }
+
+    /**
+     * Get MemoryFriendlyTreeSet from given filename and given burnin inputs.
+     *
+     * @param treeFilePath          filename of trees file
+     * @param burnInPercentageInput burnin input checked to be in bounds, altered otherwise
+     * @return MemoryFriendlyTreeSet for given inputs
+     * @throws IOException ...
+     */
+    public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(String treeFilePath, Input<Integer> burnInPercentageInput) throws IOException {
         int burnin = Math.max(burnInPercentageInput.get(), 0);
         if (burnin >= 100) {
             Log.warning("Burnin input at least 100% (" + burnin + "); set to default of 10%.");
             burnin = 10;
         }
-        return new TreeAnnotator().new MemoryFriendlyTreeSet(treeInput.get().getPath(), burnin);
+        return new TreeAnnotator().new MemoryFriendlyTreeSet(treeFilePath, burnin);
     }
 
     /**
@@ -55,6 +66,5 @@ public class CCDToolUtil {
         }
         return ccd;
     }
-
 
 }

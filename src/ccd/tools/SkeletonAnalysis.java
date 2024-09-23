@@ -19,7 +19,6 @@ import ccd.model.CCDType;
 import ccd.model.FilteredCCD;
 import ccd.model.HeightSettingStrategy;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -50,8 +49,11 @@ public class SkeletonAnalysis extends Runnable {
             RogueDetection.TerminationStrategy.values());
     final public Input<Double> terminationThresholdInput = new Input<>("terminationThreshold",
             "threshold for termination strategy (if not default or exhaustive strategy)");
+
     // - for MAP tree
-    enum hss {CA,  MH, ONE};
+    enum hss {CA, MH, ONE}
+
+    ;
     final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
@@ -93,7 +95,7 @@ public class SkeletonAnalysis extends Runnable {
 
         // run analysis
         int maxCladeSize = Math.max(maxCladeSizeInput.get(), 1);
-        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves()-1);
+        maxCladeSize = Math.min(maxCladeSize, ccd.getNumberOfLeaves() - 1);
         double minProbability = minProbabilityInput.get();
         ArrayList<AbstractCCD> ccds = RogueDetection.detectRoguesWhileImproving(ccd,
                 maxCladeSize, strategyInput.get(), terminationStrategy, minProbability, true);
