@@ -1,4 +1,4 @@
-## CCD Package for [BEAST 2](beast2.org/)
+## CCD Package for [BEAST 2](https://www.beast2.org/)
 
 Implementation of the conditional clade distribution (CCD), which offers an estimates of the posterior tree (topology) distribution learned from the sample, as well as associated tools and algorithms.
 Three parametrisations of a CCD are implemented, namely, based on clade frequencies (CCD0), clade split frequencies (CCD1), and pairs of clade split frequencies (CCD2).
@@ -47,6 +47,9 @@ Click OK and now CCD should be listed in the package manager (as in the first di
 * Run `ant install` from the CCD directory
   
 ## Usage
+
+### Point Estimates
+
 
 Start TreeAnnotator, and select `MAP (CCD0)` from the drop down box next to `Target tree type`:
 
