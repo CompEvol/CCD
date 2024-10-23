@@ -9,9 +9,9 @@ The package further incldues tools for entropy-based rogue analysis and rogue re
 See the [CCD-Research repository](https://github.com/CompEvol/CCD-Research) for information, scripts, and data of the associated research papers,
 and see the instructions below on how to use the tools.
 
-## Install through BEAUti
+## Install the package
 
-# Installing the package
+### Installing through BEAUti
 
 CCD is a [BEAST2](http://beast2.org) package that requires BEAST 2 v2.7.6.
 If you have not already done so, you can get BEAST 2 from [here](http://beast2.org).
@@ -28,9 +28,7 @@ If the CCD package is not listed, you may need to add a package repository by cl
 
 Click OK and now CCD should be listed in the package manager (as in the first dialog above). Select and click Install/Upgrade to install.
 
-
-
-## Install by hand
+### Install by hand
 
 * Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.4.zip)
 * Create CCD directory inside BEAST package directory
