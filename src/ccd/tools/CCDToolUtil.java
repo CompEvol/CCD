@@ -7,6 +7,7 @@ import beastfx.app.util.TreeFile;
 import ccd.model.AbstractCCD;
 import ccd.model.CCD0;
 import ccd.model.CCD1;
+import ccd.model.CCD2;
 import ccd.model.CCDType;
 
 import java.io.IOException;
@@ -16,30 +17,31 @@ import java.io.IOException;
  * to reduce redundant code.
  */
 public class CCDToolUtil {
+
     /**
      * Get MemoryFriendlyTreeSet from given filename input and given burnin inputs.
      *
-     * @param treeInput             trees file input
-     * @param burnInPercentageInput burnin input checked to be in bounds, altered otherwise
+     * @param treeInput        trees file input
+     * @param burnInPercentage burnin input checked to be in bounds, altered otherwise
      * @return MemoryFriendlyTreeSet for given inputs
      * @throws IOException ...
      */
-    public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(Input<TreeFile> treeInput, Input<Integer> burnInPercentageInput) throws IOException {
-        return getTreeSet(treeInput.get().getPath(), burnInPercentageInput);
+    public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(Input<TreeFile> treeInput, int burnInPercentage) throws IOException {
+        return getTreeSet(treeInput.get().getPath(), burnInPercentage);
     }
 
     /**
      * Get MemoryFriendlyTreeSet from given filename and given burnin inputs.
      *
-     * @param treeFilePath          filename of trees file
-     * @param burnInPercentageInput burnin input checked to be in bounds, altered otherwise
+     * @param treeFilePath     filename of trees
+     * @param burnInPercentage burnin input checked to be in bounds, altered otherwise
      * @return MemoryFriendlyTreeSet for given inputs
      * @throws IOException ...
      */
-    public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(String treeFilePath, Input<Integer> burnInPercentageInput) throws IOException {
-        int burnin = Math.max(burnInPercentageInput.get(), 0);
+    public static TreeAnnotator.MemoryFriendlyTreeSet getTreeSet(String treeFilePath, int burnInPercentage) throws IOException {
+        int burnin = Math.max(burnInPercentage, 0);
         if (burnin >= 100) {
-            Log.warning("Burnin input at least 100% (" + burnin + "); set to default of 10%.");
+            Log.warning("Specified burnin input too high - (" + burnin + " >= 100%); set to default of 10%.");
             burnin = 10;
         }
         return new TreeAnnotator().new MemoryFriendlyTreeSet(treeFilePath, burnin);
@@ -60,11 +62,10 @@ public class CCDToolUtil {
         } else if (ccdType == CCDType.CCD1) {
             ccd = new CCD1(treeSet);
         } else if (ccdType == CCDType.CCD2) {
-            throw new IllegalArgumentException("CCD2 not yet supported for Rogue Analysis");
+            ccd = new CCD2(treeSet);
         } else {
             throw new IllegalArgumentException("Illegal CCD type.");
         }
         return ccd;
     }
-
 }

@@ -71,7 +71,7 @@ public class RogueAnalysis extends Runnable {
         System.out.println("    CCD type:   " + CCDType.fromName(ccdTypeInput.get()));
 
         // create base CCD
-        MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput);
+        MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
         AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput);
         ccd.computeCladeProbabilities();
 
