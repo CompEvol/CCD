@@ -50,13 +50,15 @@ Click OK and now CCD should be listed in the package manager (as in the first di
 
 ### Point Estimates
 
-
-Start TreeAnnotator, and select `MAP (CCD0)` from the drop down box next to `Target tree type`:
+The tree topolgy point estimate provided by CCD's is called the CCD MAP tree and is best accessed through TreeAnnotator.
+See also the general [tutorial](https://beast2.blogs.auckland.ac.nz/treeannotator/);
+the steps are to start TreeAnnotator, and select `MAP (CCD0)` from the drop down box next to `Target tree type`:
 
 ![tree annotator](doc/treeannotator.png)
 
-
-From a terminal, to use CCD0 for Linux and OS X run
+TreeAnnotator and thus the CCD point estimates can also be accessed from the terminal.
+Simply but `CCD0` as option for the topology (`-topology`).
+In full, the call from a terminal for Linux and OS X would be
 
 ```
 /path/to/beast/bin/treeannotator -topology CCD0 input.trees output.tree
@@ -68,6 +70,26 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 \path\to\BEAST\bat\treeannotator.bat -topology CCD0 input.trees output.tree
 ```
 
-
 For CCD1 based point estimates select `MAP (CCD1)` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
 
+### Rogue Analysis
+
+A rogue analysis computes a rogue score for each clade, including each taxon, based on a given posterior sample of *binary* trees and some parameters and prints it to a csv file.
+Furthermore, it annotates each clade in a CCD MAP tree with the respective rogue score.
+For more information, see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1) 
+and for further information and example data see the [research paper repository](https://github.com/CompEvol/CCD-Research/tree/main/skeletonsAndRogues).
+
+The tool can be accessed via the BEAST2 AppLauncher (see this [blog post](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html) for more information).
+To start a rogue analysis on your sample of trees, you can use the following command in the terminal; when you omit any necessary parameter, a GUI will pop up and give you extra information.
+```
+/path/to/applauncher RogueAnalysis -trees treeInputFile.trees -burnin 10 -minProbability 0.1 -heightSettingStrategy CA -out outputFileWithoutEnding
+```
+In particular, note that the `out` filename will be used with `.csv` to print the full rogue score information and with `.trees` for the annotated MAP tree.
+To get more information on the parameters, you can use:
+```
+/path/to/applauncher RogueAnalysis -help
+```
+
+### Skeleton Analysis
+
+TBA
