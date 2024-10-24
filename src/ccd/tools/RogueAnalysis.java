@@ -36,13 +36,12 @@ public class RogueAnalysis extends Runnable {
     // configuration
     // - for rogue score
     final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0 or CCD1", "CCD0");
-    final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to analyse", 10);
-    final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to analyse", 0.1);
+    final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to be analysed", 10);
+    final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to be analysed", 0.1);
 
     // - for MAP tree
     enum hss {CA, MH, ONE}
 
-    ;
     final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
@@ -54,9 +53,9 @@ public class RogueAnalysis extends Runnable {
 
     // output
     final public Input<OutFile> outputInput = new Input<>("out", "file name for output (without file ending)," +
-            "will be used with '.csv' for rogue score and '.trees' for annotated MAP trees");
+            "will be used with '.csv' for rogue score and '.trees' for annotated MAP trees", Validate.REQUIRED);
     final public Input<String> separatorInput = new Input<>("separator",
-            "separator used in csv; default is tab", SEPARATOR);
+            "separator used in csv file; default is tab", SEPARATOR);
 
     @Override
     public void initAndValidate() {

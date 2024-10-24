@@ -37,7 +37,7 @@ public class SkeletonAnalysis extends Runnable {
     // configuration
     // - for skeleton computation
     final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0 or CCD1", "CCD0");
-    final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum clade size to consider removing", 10);
+    final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to be considered for removing", 10);
     final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to analyse", 0.5);
     final public Input<RogueDetection.RogueDetectionStrategy> strategyInput = new Input<>("detectionStrategy",
             "rogue detection strategy (default recommended); one of " + Arrays.toString(RogueDetection.RogueDetectionStrategy.values()),
@@ -53,7 +53,6 @@ public class SkeletonAnalysis extends Runnable {
     // - for MAP tree
     enum hss {CA, MH, ONE}
 
-    ;
     final public Input<hss> heightSettingStrategyInput = new Input<>("heightSettingStrategy",
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
@@ -62,7 +61,7 @@ public class SkeletonAnalysis extends Runnable {
             " -- can be comma, tab or newline delimited.");
 
     // output
-    final public Input<OutFile> outputInput = new Input<>("out", "reduced tree output file. Tree set will not be filtered if not specified");
+    final public Input<OutFile> outputInput = new Input<>("out", "reduced tree output file; the given tree set will not be filtered if not specified");
 
     @Override
     public void initAndValidate() {
