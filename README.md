@@ -72,24 +72,71 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 
 For CCD1 based point estimates select `MAP (CCD1)` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
 
-### Rogue Analysis
+### Phylogenetic Entropy, Rogue & Skeleton Analysis
 
-A rogue analysis computes a rogue score for each clade, including each taxon, based on a given posterior sample of *binary* trees and some parameters and prints it to a csv file.
-Furthermore, it annotates each clade in a CCD MAP tree with the respective rogue score.
-For more information, see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1) 
+The CCD package has three tools (small apps) to compute the phylogenetic entropy of a tree set, compute rogues scores for each clade, and conduct a skeleton anaylsis
+that can each be executed with [BEAST2's AppLauncher](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html). 
+Note that the given trees *need to be binary* and are assumed to be rooted; they are typically given by a NEXUS `.tree` file, but a list of Newick strings also works.
+For more information on the concepts see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1) 
 and for further information and example data see the [research paper repository](https://github.com/CompEvol/CCD-Research/tree/main/skeletonsAndRogues).
 
-The tool can be accessed via the BEAST2 AppLauncher (see this [blog post](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html) for more information).
-To start a rogue analysis on your sample of trees, you can use the following command in the terminal; when you omit any necessary parameter, a GUI will pop up and give you extra information.
+
+#### Phylogenetic Entropy
+You can compute the **phylogenetic entropy** of your posterior tree distribution with [BEAST2's AppLauncher](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html).
+The tool `EntropyCalculator` computes the phylogenetic entrpoy of our posterior tree distribution (computed via CCD). You can call from the terminal with the following command:
 ```
-/path/to/applauncher RogueAnalysis -trees treeInputFile.trees -burnin 10 -minProbability 0.1 -heightSettingStrategy CA -out outputFileWithoutEnding
+/path/to/applauncher EntropyCalculator -trees /path/to/treeInputFile.trees -burnin 10 -ccdType CCD0
 ```
-In particular, note that the `out` filename will be used with `.csv` to print the full rogue score information and with `.trees` for the annotated MAP tree.
-To get more information on the parameters, you can use:
+It has three parameters:
+- `trees`: trees file for which to compute entropy (required)
+- `burnin`: percentage of trees to be used as burn-in (default: `10%`)
+- `ccdType`: either `CCD0`, `CCD1`, or `CCD2` (default: `CCD0`)
+
+
+### Rogue Analysis
+
+A rogue analysis computes a **rogue score** for each clade, including each taxon, based on a given posterior sample of *binary* trees and some parameters and prints it to a csv file.
+Furthermore, it annotates each clade in a CCD MAP tree with the respective rogue score.
+The start a rogue analysis, you can use this command:
 ```
-/path/to/applauncher RogueAnalysis -help
+/path/to/applauncher RogueAnalysis -trees /path/to/treeInputFile.trees -burnin 10 -minProbability 0.1 -out outputFileWithoutEnding
 ```
+The app has the following parameters:
+- `trees`: trees file to construct CCD with and analyse (required)
+- `burnin`: percentage of trees that is burnin (default: `10%`)
+- `ccdType`: either `CCD0` or `CCD1` (default: `CCD0`)
+- `maxCladeSize`: maximum size for clade to be analysed (default: `10`)
+- `minProbability`: minimum probability for clade to be analysed (default: `0.1`)
+- `heightSettingStrategy`: heights used in MAP tree output, can be `CA` (Mean of Least Common Ancestor heights), `MH` (mean sampled height), or `ONE` (default: `CA`)
+- `out`: file name for output (without file ending), will be used with '.csv' for rogue score and '.trees' for annotated MAP trees
+- `separator`: separator used in csv file (default: `tab`)
 
 ### Skeleton Analysis
 
-TBA
+A skeleton analysis iteratively removes the clade with the highest rogue score until a threshold is reached.
+```
+/path/to/applauncher SkeletonAnalysis -trees /path/to/treeInputFile.trees -burnin 10 -out path/to/outputTreeFile.trees
+```
+The app has the following parameters:
+- `trees`: trees file to construct CCD with and analyse (required)
+- `burnin`: percentage of trees to be used as burn-in (default: `10%`)
+- `ccdType`: either `CCD0` or `CCD1` (default: `CCD0`)
+
+Two important parameters are the termination strategy and its threshold.
+- `terminationStrategy`: termination strategy (default: `Entropy`, default treshold: `10`); other options are `Exhaustive`, `NumRogues` (fixed number of removed taxa),
+`MaxProbability` (until CCD MAP tree has at least this probability, default threshold: `0.1`),
+`Support` (until all clades have at least this support, default threshold: `0.5`)
+- `terminationThreshold`: threshold for termination strategy, if not default or exhaustive strategy (default depends on strategy)
+  
+You can pick different strategies to detect rogues, though the default strategy based on the phylogenetic entropy (`Entropy`) is recommended,
+and further speed up the computation by only consider clades for removal of small size and with significant probability.
+- `detectionStrategy`: rogue detection strategy (default: `Entropy`); other options are `MaxProbability` (clade whose removal improves the probability of CCD MAP tree the most)
+and `NumTopologies` (clade whose removal reduces the number of trees in the CCD the most)
+- `maxCladeSize`: maximum clade size to consider removing (default: `10`)
+- `minProbability`: minimum probability for clade to analyse (used to speed up computation, default: `0.5`)
+  
+If you further specify an output file, then the given tree set will be reduced/filtered to the remaining taxa
+- `out`: reduced tree output file; th given tree set will not be filtered if not specified
+- `exclude`: file name of text file containing taxa to exclude from filtering - can be comma, tab or newline delimited
+
+
