@@ -1,231 +1,234 @@
 <project basedir="." default="package" name="BUILD_CCD">
-	<description>
-	    Build CCD. 
-            Also used by Hudson CCD project. 
-	    JUnit test is available for this build.
-	    $Id: build_CCD.xml $
-	</description>
+    <description>
+        Build CCD.
+        Also used by Hudson CCD project.
+        JUnit test is available for this build.
+        $Id: build_CCD.xml $
+    </description>
 
-	<!-- set global properties for this build -->
-	<property name="CCDdir" location="../CCD/"/>
-	<property name="srcCCD" location="${CCDdir}/src" />
-	<property name="buildCCD" location="${CCDdir}/build" />
-	<property name="libCCD" location="${CCDdir}/lib" />
-	<property name="release_dir" value="${CCDdir}/release" />
-	<property name="distCCD" location="${buildCCD}/dist" />
-	<property name="beast2path" location="../beast2" />
-	<property name="libBeast2" location="${beast2path}/lib" />
-	<property name="srcBeast2" location="${beast2path}/src" />
-	<property name="beast2classpath" location="${beast2path}/build" />
-	<property name="Add_on_dir" value="${release_dir}/add-on" />
-	<property name="beastapp2path" location="../BeastFX" />
-	<property name="beastapp2classpath" location="${beastapp2path}/build" />
-	<property name="asmclasspath" location="../asm/build" />
-	
+    <!-- set global properties for this build -->
+    <property name="CCDdir" location="../CCD/"/>
+    <property name="srcCCD" location="${CCDdir}/src"/>
+    <property name="buildCCD" location="${CCDdir}/build"/>
+    <property name="libCCD" location="${CCDdir}/lib"/>
+    <property name="release_dir" value="${CCDdir}/release"/>
+    <property name="distCCD" location="${buildCCD}/dist"/>
+    <property name="beast2path" location="../beast2"/>
+    <property name="libBeast2" location="${beast2path}/lib"/>
+    <property name="srcBeast2" location="${beast2path}/src"/>
+    <property name="beast2classpath" location="${beast2path}/build"/>
+    <property name="Add_on_dir" value="${release_dir}/add-on"/>
+    <property name="beastapp2path" location="../BeastFX"/>
+    <property name="beastapp2classpath" location="${beastapp2path}/build"/>
+    <property name="asmclasspath" location="../asm/build"/>
 
+    <import file="${beast2path}/build.xml"/>
 
-    <import file="${beast2path}/build.xml" />
+    <property name="main_class_BEAST" value="beast.app.BeastMCMC"/>
+    <property name="report" value="${buildCCD}/junitreport"/>
 
-	<property name="main_class_BEAST" value="beast.app.BeastMCMC" />
-	<property name="report" value="${buildCCD}/junitreport"/>
-
-	<path id="classpath">
+    <path id="classpath">
         <pathelement path="${buildCCD}"/>
-	    <fileset dir="${libBeast2}" includes="antlr-runtime-4.10.1.jar"/>	
-	    <fileset dir="${libBeast2}" includes="commons-math3-3.6.1.jar"/>
-	    <fileset dir="${libBeast2}" includes="fest.jar"/>
+        <fileset dir="${libBeast2}" includes="antlr-runtime-4.10.1.jar"/>
+        <fileset dir="${libBeast2}" includes="commons-math3-3.6.1.jar"/>
+        <fileset dir="${libBeast2}" includes="fest.jar"/>
         <fileset dir="${libBeast2}" includes="beagle.jar"/>
         <fileset dir="${libBeast2}" includes="jam.jar"/>
         <fileset dir="${libBeast2}" includes="colt.jar"/>
         <pathelement path="${beast2classpath}"/>
         <pathelement path="${beastapp2classpath}"/>
         <pathelement path="${asmclasspath}"/>
-         <fileset dir="${libBeast2}/junit" includes="junit-platform-console-standalone-1.8.2.jar"/>
- 	</path>
+        <fileset dir="${libBeast2}/junit" includes="junit-platform-console-standalone-1.8.2.jar"/>
+    </path>
 
-	<!-- start -->
-	<target name="initCCD">
-		<echo message="${ant.project.name}: ${ant.file}" />
+    <!-- start -->
+    <target name="initCCD">
+        <echo message="${ant.project.name}: ${ant.file}"/>
 
-	    <available file="${CCDdir}/version.xml" property="versionAvailable"/>
-    	<fail unless="versionAvailable">
-	      ** Required file version.xml does not exist. **
-	    </fail>
+        <available file="${CCDdir}/version.xml" property="versionAvailable"/>
+        <fail unless="versionAvailable">
+            ** Required file version.xml does not exist. **
+        </fail>
 
-    	<!-- Read package name and version from xml file -->
-	    <xmlproperty file="${CCDdir}/version.xml" prefix="fromVersionFile" />
-        <property name="projName" value="${fromVersionFile.package(name)}" />
-    	<property name="CCDversion" value="${fromVersionFile.package(version)}" />
-	</target>
+        <!-- Read package name and version from xml file -->
+        <xmlproperty file="${CCDdir}/version.xml" prefix="fromVersionFile"/>
+        <property name="projName" value="${fromVersionFile.package(name)}"/>
+        <property name="CCDversion" value="${fromVersionFile.package(version)}"/>
+    </target>
 
-	<target name="cleanCCD">
-    	<delete dir="${buildCCD}" />
-	</target>
+    <target name="cleanCCD">
+        <delete dir="${buildCCD}"/>
+    </target>
 
-	<!-- clean previous build, and then compile Java source code, and Juint test -->
-	<target name="build_all_CCD" depends="cleanCCD,compile-allCCD,junitCCD"
-        description="Clean and Build all run-time stuff">
-	</target>
+    <!-- clean previous build, and then compile Java source code, and Juint test -->
+    <target name="build_all_CCD" depends="cleanCCD,compile-allCCD,junitCCD"
+            description="Clean and Build all run-time stuff">
+    </target>
 
-	<!-- clean previous build, compile Java source code, and Junit test, and make the beast.jar and beauti.jar -->
-	<target name="build_jar_all_CCD" depends="cleanCCD,compile-allCCD,junitCCD,dist_all_CCD"
-        description="Clean and Build all run-time stuff">
-	</target>
-
-
-	<!-- No JUnit Test, clean previous build, compile Java source code, and make the CCD.jar and beauti.jar -->
-	<target name="build_jar_all_CCD_NoJUnitTest" depends="cleanCCD,compile-allCCD,dist_all_CCD"
-        description="Clean and Build all run-time stuff">
-	</target>
-
-	<!-- compile Java source code -->
-	<target name="compile-allCCD" depends="initCCD,compile-all">
+    <!-- clean previous build, compile Java source code, and Junit test, and make the beast.jar and beauti.jar -->
+    <target name="build_jar_all_CCD" depends="cleanCCD,compile-allCCD,junitCCD,dist_all_CCD"
+            description="Clean and Build all run-time stuff">
+    </target>
 
 
-	    <!-- Capture the path as a delimited property using the refid attribute -->
-	    <property name="myclasspath" refid="classpath"/>
-	    <!-- Emit the property to the ant console -->
-	    <echo message="Classpath = ${myclasspath}"/>
+    <!-- No JUnit Test, clean previous build, compile Java source code, and make the CCD.jar and beauti.jar -->
+    <target name="build_jar_all_CCD_NoJUnitTest" depends="cleanCCD,compile-allCCD,dist_all_CCD"
+            description="Clean and Build all run-time stuff">
+    </target>
 
-		<mkdir dir="${buildCCD}" />
+    <!-- compile Java source code -->
+    <target name="compile-allCCD" depends="initCCD,compile-all">
 
-		<!-- Compile the java code from ${srcCCD} into ${buildCCD} /bin -->
-		<javac srcdir="${srcCCD}" destdir="${buildCCD}" classpathref="classpath" 
-		       fork="true"
-		       memoryinitialsize="256m"
-		       memorymaximumsize="256m">
-			<include name="ccd/**/**" />
-			<exclude name="ccd/experiments/**" />
-			<!-- compile JUnit test classes -->
-			<include name="test/ccd/**" />
-		</javac>
-		<echo message="Successfully compiled." />
-	</target>
 
-	<!-- make the beast.jar and beauti.jar -->
-	<target name="dist_all_CCD" depends="compile-allCCD" description="create CCD jar">
-		<!-- Create the distribution directory -->
-		<mkdir dir="${distCCD}" />
+        <!-- Capture the path as a delimited property using the refid attribute -->
+        <property name="myclasspath" refid="classpath"/>
+        <!-- Emit the property to the ant console -->
+        <echo message="Classpath = ${myclasspath}"/>
 
-		<jar jarfile="${distCCD}/CCD.src.jar">
-			<fileset dir="${srcCCD}">
-				<include name="**/*.java" />
-				<include name="**/*.css" />
-			</fileset>
+        <mkdir dir="${buildCCD}"/>
+
+        <!-- Compile the java code from ${srcCCD} into ${buildCCD} /bin -->
+        <javac srcdir="${srcCCD}" destdir="${buildCCD}" classpathref="classpath"
+               fork="true"
+               memoryinitialsize="256m"
+               memorymaximumsize="256m">
+            <include name="ccd/**/**"/>
+            <exclude name="ccd/experiments/**"/>
+            <!-- compile JUnit test classes -->
+            <include name="test/ccd/**"/>
+        </javac>
+        <echo message="Successfully compiled."/>
+    </target>
+
+    <!-- make the beast.jar and beauti.jar -->
+    <target name="dist_all_CCD" depends="compile-allCCD" description="create CCD jar">
+        <!-- Create the distribution directory -->
+        <mkdir dir="${distCCD}"/>
+
+        <jar jarfile="${distCCD}/CCD.src.jar">
+            <fileset dir="${srcCCD}">
+                <include name="**/*.java"/>
+                <include name="**/*.css"/>
+            </fileset>
         </jar>
-		<jar jarfile="${distCCD}/CCD.package.jar">
-			<manifest>
-				<attribute name="Built-By" value="${user.name}" />
-			</manifest>
-			<fileset dir="${buildCCD}">
-				<include name="**/*.class" />
-				<include name="**/*.class" />
-				<include name="**/*.css" />
-			</fileset>
-		</jar>
-	</target>
+        <jar jarfile="${distCCD}/CCD.package.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+            </manifest>
+            <fileset dir="${buildCCD}">
+                <include name="**/*.class"/>
+                <include name="**/*.class"/>
+                <include name="**/*.css"/>
+            </fileset>
+        </jar>
+    </target>
 
-	<!-- run beast.jar -->
-	<target name="run_CCD">
-		<java jar="${distCCD}/CCD.jar" fork="true" />
-	</target>
+    <!-- run beast.jar -->
+    <target name="run_CCD">
+        <java jar="${distCCD}/CCD.jar" fork="true"/>
+    </target>
 
-	
-	<!-- JUnit test -->
-	<target name="junitCCD">
-		<mkdir dir="${report}" />
-		<junit printsummary="yes"> <!--showoutput='yes'-->
-			<classpath>
-				<path refid="classpath" />
-				<path location="${buildCCD}" />
-			</classpath>
+    <!-- JUnit test -->
+    <target name="junitCCD">
+        <mkdir dir="${report}"/>
+        <junit printsummary="yes"> <!--showoutput='yes'-->
+            <classpath>
+                <path refid="classpath"/>
+                <path location="${buildCCD}"/>
+            </classpath>
 
-			<formatter type="xml" />
+            <formatter type="xml"/>
 
-			<batchtest fork="yes" todir="${report}">
-				<fileset dir="${srcCCD}">
-                    <include name="test/**/*Test.java"/>                                         
-				</fileset>
-				<fileset dir="${srcBeast2}">
-                    <include name="test/beast/integration/**/*Test.java"/>                                         
-                    <exclude name="test/beast/integration/**/ResumeTest.java"/>                                         
-				</fileset>
-			</batchtest>
-		</junit>
-		<echo message="JUnit test finished." />
-	</target>
-    
+            <batchtest fork="yes" todir="${report}">
+                <fileset dir="${srcCCD}">
+                    <include name="test/**/*Test.java"/>
+                </fileset>
+                <fileset dir="${srcBeast2}">
+                    <include name="test/beast/integration/**/*Test.java"/>
+                    <exclude name="test/beast/integration/**/ResumeTest.java"/>
+                </fileset>
+            </batchtest>
+        </junit>
+        <echo message="JUnit test finished."/>
+    </target>
+
     <target name="junitreport">
-		<junitreport todir="${report}">
-			<fileset dir="${report}" includes="*.xml"/>
-			<report format="frames" todir="${report}"/>
-		</junitreport>
-		<echo message="JUnit test report finished." />
-	</target>
+        <junitreport todir="${report}">
+            <fileset dir="${report}" includes="*.xml"/>
+            <report format="frames" todir="${report}"/>
+        </junitreport>
+        <echo message="JUnit test report finished."/>
+    </target>
 
-	<target name="addon" depends="package"/>
+    <target name="addon" depends="package"/>
 
-	<target name="package"
-	        depends="build_jar_all_CCD_NoJUnitTest"
-	        description="release BEAST 2 add-on version of CCD">
+    <target name="package"
+            depends="build_jar_all_CCD_NoJUnitTest"
+            description="release BEAST 2 add-on version of CCD">
 
-		<delete dir="${Add_on_dir}" />
-		<!-- Create the release directory -->
-		<mkdir dir="${Add_on_dir}" />
-		<mkdir dir="${Add_on_dir}/lib" />
-		<mkdir dir="${Add_on_dir}/examples" />
-		<mkdir dir="${Add_on_dir}/fxtemplates" />
+        <delete dir="${Add_on_dir}"/>
+        <!-- Create the release directory -->
+        <mkdir dir="${Add_on_dir}"/>
+        <mkdir dir="${Add_on_dir}/lib"/>
+        <mkdir dir="${Add_on_dir}/examples"/>
+        <mkdir dir="${Add_on_dir}/fxtemplates"/>
 
-		<copy todir="${Add_on_dir}">
-			<fileset file="version.xml"/>
-		</copy>
-		<copy todir="${Add_on_dir}/examples">
-			<fileset dir="examples" />
-		</copy>
-		<copy todir="${Add_on_dir}/lib">
-			<fileset dir="${distCCD}" includes="CCD.package.jar" />
-		</copy>
-		<copy todir="${Add_on_dir}">
-			<fileset dir="${distCCD}" includes="CCD.src.jar" />
-		</copy>
-		<!-->
-		<copy todir="${Add_on_dir}/fxtemplates">
-			<fileset file="fxtemplates/CCD.xml" />
-		</copy>
-		-->
-		<jar jarfile="${distCCD}/CCD.package.v${CCDversion}.zip">
-			<fileset dir="${Add_on_dir}">
-				<include name="**/*" />
-			</fileset>
+        <copy todir="${Add_on_dir}">
+            <fileset file="version.xml"/>
+        </copy>
+        <copy todir="${Add_on_dir}/examples">
+            <fileset dir="examples"/>
+        </copy>
+        <copy todir="${Add_on_dir}/lib">
+            <fileset dir="${distCCD}" includes="CCD.package.jar"/>
+        </copy>
+        <copy todir="${Add_on_dir}">
+            <fileset dir="${distCCD}" includes="CCD.src.jar"/>
+        </copy>
+        <!-->
+        <copy todir="${Add_on_dir}/fxtemplates">
+            <fileset file="fxtemplates/CCD.xml" />
+        </copy>
+        -->
+        <jar jarfile="${distCCD}/CCD.package.v${CCDversion}.zip">
+            <fileset dir="${Add_on_dir}">
+                <include name="**/*"/>
+            </fileset>
         </jar>
-		<echo message="Add-on version v${CCDversion} release is finished." />
-	</target>
+        <echo message="Add-on version v${CCDversion} release is finished."/>
+    </target>
 
+    <condition property="isWindows">
+        <os family="windows"/>
+    </condition>
+    <condition property="isLinux">
+        <and>
+            <os family="unix"/>
+            <not>
+                <os family="mac"/>
+            </not>
+        </and>
+    </condition>
+    <condition property="isMac">
+        <os family="mac"/>
+    </condition>
 
+    <target name="installLinux" depends="package" if="isLinux">
+        <mkdir dir="${user.home}/.beast/2.7/${projName}"/>
+        <unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/.beast/2.7/${projName}"/>
+    </target>
 
-	<condition property="isWindows"><os family="windows" /></condition>
-	<condition property="isLinux"><and><os family="unix"/><not><os family="mac"/></not></and></condition>
-	<condition property="isMac"><os family="mac" /></condition>
+    <target name="installMac" depends="package" if="isMac">
+        <mkdir dir="${user.home}/.beast/2.7/${projName}"/>
+        <unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/Library/Application Support/BEAST/2.7/${projName}"/>
+    </target>
 
-	<target name="installLinux" depends="package" if="isLinux">
-	        <mkdir dir="${user.home}/.beast/2.7/${projName}"/>
-			<unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/.beast/2.7/${projName}"/>
-	</target>
+    <target name="installWindows" depends="package" if="isWindows">
+        <mkdir dir="${user.home}/BEAST/2.7/${projName}"/>
+        <unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/BEAST/2.7/${projName}"/>
+    </target>
 
-	<target name="installMac" depends="package" if="isMac">
-	        <mkdir dir="${user.home}/.beast/2.7/${projName}"/>
-			<unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/Library/Application Support/BEAST/2.7/${projName}"/>
-	</target>
-
-	<target name="installWindows" depends="package" if="isWindows">
-	        <mkdir dir="${user.home}/BEAST/2.7/${projName}"/>
-			<unzip src="${distCCD}/CCD.package.v${CCDversion}.zip" dest="${user.home}/BEAST/2.7/${projName}"/>
-	</target>
-
-	<target name="install" depends="installWindows,installMac,installLinux">
-	</target>
-
-
-
+    <target name="install" depends="installWindows,installMac,installLinux">
+    </target>
 
 </project>
