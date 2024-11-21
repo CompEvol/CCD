@@ -1,5 +1,6 @@
 package ccd.tools;
 
+
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
@@ -24,6 +25,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static ccd.algorithms.RogueDetection.TerminationStrategy.*;
@@ -57,6 +59,9 @@ public class SkeletonAnalysis extends Runnable {
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
             hss.values());
+    
+    final public Input<OutFile> rogueTaxaFileInput = new Input<>("rogueTaxaFile", "file name to output text file containing taxa of rogue removal sequence");
+    
     final public Input<OutFile> excludeInput = new Input<>("exclude", "file name of text file containing taxa to exclude from filtering" +
             " -- can be comma, tab or newline delimited.");
 
@@ -102,15 +107,34 @@ public class SkeletonAnalysis extends Runnable {
         // report removed clades
         System.out.println("Final rogue removal sequence to obtain skeleton");
         System.out.println("n - entropy - num clades - removed taxa");
+        List<String> rogueTaxa = new ArrayList<>();
         for (AbstractCCD ccdi : ccds) {
             System.out.println(ccdi.getRootClade().getCladeInBits().cardinality() + " - " //
                     + ccdi.getEntropy() + " - " //
                     + ccdi.getNumberOfClades() + " - "//
                     + ((ccdi instanceof FilteredCCD) ? ccd.getTaxaNames(((FilteredCCD) ccdi).getRemovedTaxaMask()) : ""));
+        	if (ccdi instanceof FilteredCCD) {
+        		String str = ccd.getTaxaNames(((FilteredCCD) ccdi).getRemovedTaxaMask());
+        		str = str.replaceAll("\\{", "");
+        		str= str.replaceAll("\\}", "");
+        		String [] strs = str.split(",");
+        		for (String s : strs) {
+        			rogueTaxa.add(s);
+        		}
+            }
         }
 
+        PrintStream roguesOutput = null;
+        if (rogueTaxaFileInput.get() != null && !rogueTaxaFileInput.get().getName().equals("[[none]]")) {
+        	roguesOutput = new PrintStream(rogueTaxaFileInput.get());
+    		for (String taxon : rogueTaxa) {
+    			roguesOutput.println(taxon);
+    		}
+        	roguesOutput.close();
+        }
+        
         // filter tree set if outputInput is specified
-        filterTrees(treeSet, ccds);
+        filterTrees(treeSet, ccds, rogueTaxa);
 
         // annotate MAP tree
         System.out.println("\n> annotate CCD MAP tree");
@@ -124,7 +148,7 @@ public class SkeletonAnalysis extends Runnable {
     }
 
     /* Extracted code that filters source treeset. */
-    private void filterTrees(MemoryFriendlyTreeSet treeSet, ArrayList<AbstractCCD> ccds) throws IOException {
+    private void filterTrees(MemoryFriendlyTreeSet treeSet, ArrayList<AbstractCCD> ccds, List<String> rogueTaxa) throws IOException {
         if (outputInput.get() != null && !outputInput.get().getName().equals("[[none]]")) {
 
             System.out.println("\n> Output filtered trees to " + outputInput.get().getPath());
@@ -133,6 +157,7 @@ public class SkeletonAnalysis extends Runnable {
             // compute which taxa to include and which to exclude
             Set<String> taxaToInclude = new HashSet<>();
             Set<String> taxaToExclude = new HashSet<>();
+            taxaToExclude.addAll(rogueTaxa);
             Tree tree = treeSet.next();
             for (int i = 0; i < tree.getLeafNodeCount(); i++) {
                 taxaToInclude.add(tree.getNode(i).getID());
@@ -155,6 +180,7 @@ public class SkeletonAnalysis extends Runnable {
             AbstractCCD ccd = ccds.get(0);
             BitSet taxaToKeepBits = lastCCD.getTaxaAsBitSet();
             Set<String> taxaNamesToKeep = ccd.getTaxaNamesList(taxaToKeepBits);
+            taxaNamesToKeep.removeAll(taxaToExclude);
             taxaNamesToKeep.addAll(excludeFromDeletion);
 
             // process file
@@ -162,7 +188,7 @@ public class SkeletonAnalysis extends Runnable {
             treeSet.reset();
             while (treeSet.hasNext()) {
                 Node root = treeSet.next().getRoot();
-                root = filterTree(root, taxaToInclude);
+                root = filterTree(root, taxaNamesToKeep);
                 out.println(root.toNewick());
             }
             out.close();
