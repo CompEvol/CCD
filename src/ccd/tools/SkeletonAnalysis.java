@@ -45,11 +45,11 @@ public class SkeletonAnalysis extends Runnable {
             "rogue detection strategy (default recommended); one of " + Arrays.toString(RogueDetection.RogueDetectionStrategy.values()),
             RogueDetection.RogueDetectionStrategy.Entropy,
             RogueDetection.RogueDetectionStrategy.values());
-    final public Input<RogueDetection.TerminationStrategy> terminationInput = new Input<>("terminationStrategy",
+    final public Input<RogueDetection.TerminationStrategy> terminationInput = new Input<>("strategyTermination",
             "termination strategy (default recommended); one of " + Arrays.toString(RogueDetection.TerminationStrategy.values()),
             RogueDetection.TerminationStrategy.Entropy,
             RogueDetection.TerminationStrategy.values());
-    final public Input<Double> terminationThresholdInput = new Input<>("terminationThreshold",
+    final public Input<Double> terminationThresholdInput = new Input<>("thresholdTermination",
             "threshold for termination strategy (if not default or exhaustive strategy)");
 
     // - for MAP tree

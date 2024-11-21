@@ -76,13 +76,13 @@ public class RogueDetection {
      */
     public enum TerminationStrategy {
         /** Run until no further improvement possible. */
-        Exhaustive("exhaustive strategy"),
+        Exhaustive("exhaustive"),
         /** Run until a set number of rogues (with {@link #setThreshold(double)}) have been removed. */
-        NumRogues("fixed-number-rogues strategy"),
+        NumRogues("fixed-number-rogues"),
         /** Run until an entropy threshold is passed (from above) set with {@link #setThreshold(double)}. */
-        Entropy("entropy threshold"),
+        Entropy("entropy"),
         /** Run until the CCD MAP tree has at least the probability set with {@link #setThreshold(double)}. */
-        MaxProbability("probability threshold"),
+        MaxProbability("probability"),
         /**
          * Stops when every clade in the max CCP tree in the current CCD has a
          * support (or clade credibility, with respect to the trees sample the
@@ -90,7 +90,7 @@ public class RogueDetection {
          * {@value #SUPPORT_THRESHOLD_DEFAULT} or a manually set value (with
          * {@link #setThreshold(double)}
          */
-        Support("all-clades-min-support strategy");
+        Support("all-clades-min-support");
 
         /** Default number of rogue taxa for {@link #NumRogues} strategy. */
         public static final double NUM_ROGUES_THRESHOLD_DEFAULT = 10;
