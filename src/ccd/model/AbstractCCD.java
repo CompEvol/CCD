@@ -41,6 +41,9 @@ import java.util.Set;
  */
 public abstract class AbstractCCD implements ITreeDistribution {
 
+    /** Key for posterior support (clade probability) of vertex based on CCD. */
+    public static final String CLADE_SUPPORT_KEY = "posterior";
+
     /** Whether to print information during construction, etc. */
     public static boolean verbose = true;
 
@@ -855,6 +858,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
             vertex = new Node(taxonName);
             vertex.setNr(leafNr);
+            vertex.setMetaData(CLADE_SUPPORT_KEY, 1.0);
             // vertex.setNr(runningLeafIndex++);
             if (heightStrategy != null) {
                 // common ancestor, mean height and ONE all use the same height for leaves
@@ -874,7 +878,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
             // These are not needed and only make the output newick longer
             vertex = new Node();
             vertex.setNr(runningInnerIndex++);
-            String posteriorSupport = "posterior=" + clade.getProbability();
+            double cladeProbability = clade.getProbability();
+            vertex.setMetaData(CLADE_SUPPORT_KEY, cladeProbability);
+            String posteriorSupport = CLADE_SUPPORT_KEY + "=" + cladeProbability;
             if (vertex.metaDataString != null) {
                 vertex.metaDataString += "," + posteriorSupport;
             } else {

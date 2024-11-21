@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -370,7 +371,10 @@ public class RogueDetection {
                     case Support:
                         Tree tree = bestCCDs[i].getMAPTree();
                         double minSupport =
-                                Arrays.stream(tree.getNodesAsArray()).map(x -> (Double) x.getMetaData("posterior")).min(Double::compare).orElse(0.0);
+                                Arrays.stream(tree.getNodesAsArray())
+                                        .filter(Objects::nonNull)
+                                        .map(x -> (Double) x.getMetaData(AbstractCCD.CLADE_SUPPORT_KEY))
+                                        .min(Double::compare).orElse(0.0);
                         if (minSupport >= terminationStrategy.threshold) {
                             System.out.println("\nEnd of rogue detection - support threshold of "
                                     + terminationStrategy.getThreshold() + " passed");
