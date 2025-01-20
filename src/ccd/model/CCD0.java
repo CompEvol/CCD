@@ -67,7 +67,7 @@ public class CCD0 extends AbstractCCD {
     private Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
-    private PrintStream progressStream = null;
+    private PrintStream progressStream = System.out;
 
     /** Progress counted of clades handled in the expand step. */
     private int progressed = 0;
@@ -75,7 +75,7 @@ public class CCD0 extends AbstractCCD {
     /** If given, only (number of taxa) times this factor of clades are considered
      * when expanding the CCD1 graph. This speeds-up the costly expansion for large
      * datasets but leads to an approximation. */
-    private Double maxExpansionFactor = null;
+    private int maxExpansionFactor = -1;
 
     // variables for parallelization
     /** Threshold of number of clades on whether to use parallelization for expand. */
@@ -163,10 +163,9 @@ public class CCD0 extends AbstractCCD {
      *                                    {@link CCD0}
      * @param maxExpansionFactor
      */
-    public CCD0(TreeSet treeSet, boolean storeBaseTrees, double maxExpansionFactor) {
+    public CCD0(TreeSet treeSet, boolean storeBaseTrees, int maxExpansionFactor) {
         super(treeSet, storeBaseTrees);
         this.maxExpansionFactor = maxExpansionFactor;
-        this.useLogProbabilities = true;
         initialize();
     }
 
@@ -247,8 +246,6 @@ public class CCD0 extends AbstractCCD {
      */
     private boolean dirtyStructure = true;
 
-    private boolean lostClades = false;
-
     @Override
     public void setCacheAsDirty() {
         super.setCacheAsDirty();
@@ -311,13 +308,6 @@ public class CCD0 extends AbstractCCD {
 
         }
 
-        if (lostClades && !updateOnline) {
-            System.err.println("Some probabilities are too low, causing underflow.\n" +
-                    "As a result downstream values might become NaN.\n" +
-                    "Consider using CCD1 or more burnin.");
-            lostClades = false;
-        }
-
         // out.println(" ...done.");
         if (updateOnline) {
             newClades.clear();
@@ -335,8 +325,8 @@ public class CCD0 extends AbstractCCD {
         Stream<Clade> cladesToExpand = cladeMapping.values().stream();
 
         // 1. we only expand the most frequent clades if necessary
-        if (this.maxExpansionFactor != null) {
-            int numCladesToConsider = (int) Math.floor(this.maxExpansionFactor * this.getNumberOfLeaves());
+        if (this.maxExpansionFactor != -1) {
+            int numCladesToConsider = this.maxExpansionFactor * this.getNumberOfLeaves();
             cladesToExpand = cladesToExpand.sorted(
                     Comparator.comparingInt(x -> -x.getNumberOfOccurrences())
             ).limit(numCladesToConsider);
@@ -464,7 +454,7 @@ public class CCD0 extends AbstractCCD {
 
         // otherwise we check if we find a larger partner clade for any
         // smaller clade that together partition the parent clade;
-        for (int j = 1; j < parent.size() / 2; j++) {
+        for (int j = 1; j <= parent.size() / 2; j++) {
             for (Clade smallChild : cladeBuckets.get(j - 1)) {
                 if (done.contains(smallChild)) {
                     continue;
@@ -647,10 +637,10 @@ public class CCD0 extends AbstractCCD {
                 i++;
             }
 
-            // sumSubtreeLogProbabilities can be a very tiny number due to numerical issues
+            // sumSubtreeLogProbabilities can be a very tiny positive number due to numerical issues
             // (when it should be log(1) = 0)
-            // we round very small numbers down, otherwise we throw an error
-            if (1e-14 < sumSubtreeLogProbabilities) {
+            // because we want non-positive log probabilities, round it down to 0 in this case
+            if (1e-12 < sumSubtreeLogProbabilities) {
                 throw new AssertionError("Negative probability detected.");
             } else {
                 sumSubtreeLogProbabilities = Math.min(sumSubtreeLogProbabilities, 0.0);
