@@ -181,6 +181,19 @@ public class CCD0 extends AbstractCCD {
     }
 
     /**
+     * Constructor for an empty CDD. Trees can then be processed one by one that sets .
+     *
+     * @param numLeaves      number of leaves of the trees that this CCD will be based on
+     * @param storeBaseTrees whether to store the trees used to create this CCD;
+     *                       recommended not to when huge set of trees is used
+     * @param maxExpansionFactor
+     */
+    public CCD0(int numLeaves,  boolean storeBaseTrees, int maxExpansionFactor) {
+        super(numLeaves, storeBaseTrees);
+        this.maxExpansionFactor = maxExpansionFactor;
+    }
+
+    /**
      * Configure this CCD0 to try to speed up the expand step
      * by looking for monophyletic clades.
      */
@@ -335,6 +348,10 @@ public class CCD0 extends AbstractCCD {
         List<Clade> clades = cladesToExpand.sorted(Comparator.comparingInt(x -> x.size())).toList();
         if ((progressStream != null) && verbose) {
             progressStream.println("Expanding CCD0: processing " + clades.size() + " clades");
+            if (clades.size() > 100000 && maxExpansionFactor == -1) {
+            	progressStream.println("If this takes too long, consider using Approximated CCD0 instead.");
+            	progressStream.println("This generally runs faster and gives reasonably good point estimates.");
+            }
         }
 
         // 3. clade buckets
