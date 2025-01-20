@@ -300,9 +300,8 @@ public class CCD0 extends AbstractCCD {
             try {
                 setPartitionProbabilities(this.rootClade);
             } catch (UnderflowException exception) {
-                // an underflow has occurred
-                // we try again in log space
                 System.err.println("An underflow was detected. We switch to log space.");
+                this.resetSumCladeCredibilities();
                 setPartitionLogProbabilities(this.rootClade);
             }
 
@@ -454,14 +453,14 @@ public class CCD0 extends AbstractCCD {
 
         // otherwise we check if we find a larger partner clade for any
         // smaller clade that together partition the parent clade;
-        for (int j = 1; j <= parent.size() / 2; j++) {
-            for (Clade smallChild : cladeBuckets.get(j - 1)) {
-                if (done.contains(smallChild)) {
+        for (int j = (int) Math.ceil(parent.size() / 2); j < parent.size(); j++) {
+            for (Clade largeChild : cladeBuckets.get(j - 1)) {
+                if (done.contains(largeChild)) {
                     continue;
                 }
 
-                BitSet smallChildBits = smallChild.getCladeInBits();
-                findPartitionHelper(smallChild, parent, helperBits, parentBits, smallChildBits);
+                BitSet largerChildBits = largeChild.getCladeInBits();
+                findPartitionHelper(largeChild, parent, helperBits, parentBits, largerChildBits);
             }
         }
 
@@ -598,6 +597,7 @@ public class CCD0 extends AbstractCCD {
             // a leaf has no partition, sum of probabilities is 1
             clade.setLogSumCladeCredibilities(0);
             return 0.0;
+
         } else if (clade.isCherry()) {
             // a cherry has only one partition
             if (clade.partitions.isEmpty()) {
@@ -606,6 +606,7 @@ public class CCD0 extends AbstractCCD {
             clade.partitions.get(0).setCCP(1);
             clade.setLogSumCladeCredibilities(logCladeValue);
             return logCladeValue;
+
         } else {
             // other might have more partitions
             double sumSubtreeProbabilities = 0.0;
