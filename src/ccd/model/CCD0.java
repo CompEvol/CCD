@@ -67,7 +67,7 @@ public class CCD0 extends AbstractCCD {
     private Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
-    private PrintStream progressStream;
+    private PrintStream progressStream = null;
 
     /** Progress counted of clades handled in the expand step. */
     private int progressed = 0;
@@ -76,9 +76,6 @@ public class CCD0 extends AbstractCCD {
      * when expanding the CCD1 graph. This speeds-up the costly expansion for large
      * datasets but leads to an approximation. */
     private Double maxExpansionFactor = null;
-
-    /** Whether to use log probabilities instead of probabilities; necessary for huge/diffuse CCDs. */
-    protected boolean useLogProbabilities = false;
 
     // variables for parallelization
     /** Threshold of number of clades on whether to use parallelization for expand. */
@@ -169,6 +166,7 @@ public class CCD0 extends AbstractCCD {
     public CCD0(TreeSet treeSet, boolean storeBaseTrees, double maxExpansionFactor) {
         super(treeSet, storeBaseTrees);
         this.maxExpansionFactor = maxExpansionFactor;
+        this.useLogProbabilities = true;
         initialize();
     }
 
@@ -307,6 +305,7 @@ public class CCD0 extends AbstractCCD {
             } catch (UnderflowException exception) {
                 // an underflow has occurred
                 // we try again in log space
+                System.err.println("An underflow was detected. We switch to log space.");
                 setPartitionLogProbabilities(this.rootClade);
             }
 
@@ -465,14 +464,14 @@ public class CCD0 extends AbstractCCD {
 
         // otherwise we check if we find a larger partner clade for any
         // smaller clade that together partition the parent clade;
-        for (int j = (int) Math.ceil(parent.size() / 2); j < parent.size(); j++) {
-            for (Clade bigChild : cladeBuckets.get(j - 1)) {
-                if (done.contains(bigChild)) {
+        for (int j = 1; j < parent.size() / 2; j++) {
+            for (Clade smallChild : cladeBuckets.get(j - 1)) {
+                if (done.contains(smallChild)) {
                     continue;
                 }
 
-                BitSet bigChildBits = bigChild.getCladeInBits();
-                findPartitionHelper(bigChild, parent, helperBits, parentBits, bigChildBits);
+                BitSet smallChildBits = smallChild.getCladeInBits();
+                findPartitionHelper(smallChild, parent, helperBits, parentBits, smallChildBits);
             }
         }
 

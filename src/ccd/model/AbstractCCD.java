@@ -56,6 +56,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /** Threshold used for throwing error when probability that much out of bounds (mostly above 1). */
     public final static double PROBABILITY_ERROR = 1e-5;
 
+    /** Whether to use log probabilities instead of probabilities; necessary for huge/diffuse CCDs. */
+    protected boolean useLogProbabilities = false;
+
     /**
      * The trees this CCD is based on (burnin trees removed).
      */
@@ -1196,6 +1199,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
 
     /* -- PROBABILITY - PROBABILITY -- */
+
+    protected void setToUseLogProbabilities() {
+        this.useLogProbabilities = true;
+    }
+    protected boolean useLogProbabilities() {
+        return useLogProbabilities;
+    }
 
     @Override
     public double getProbabilityOfTree(Tree tree) {
