@@ -1,5 +1,8 @@
 package ccd.tools;
 
+import java.io.IOException;
+import java.io.PrintStream;
+
 import beast.base.core.Description;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
@@ -9,25 +12,32 @@ import ccd.model.AbstractCCD;
 import ccd.model.CCD0;
 import ccd.model.HeightSettingStrategy;
 
-import java.io.IOException;
-import java.io.PrintStream;
-
-
-@Description("TreeAnnotator plugin for setting the tree topology as CCD0 MAP tree")
-public class CCD0PointEstimate extends PointEstimate implements TopologySettingService {
+@Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
+public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySettingService {
 
     @Override
     public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
             throws IOException {
 
-        progressStream.println("CCD0 MAP tree computation");
+        progressStream.println("CCD0Approx MAP tree computation");
         progressStream.println("0              25             50             75            100");
         progressStream.println("|--------------|--------------|--------------|--------------|");
 
         treeSet.reset();
         Tree tree = treeSet.next();
         Tree firstTree = tree;
-        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false);
+        int CCD0ApproxMultiplier = 50;
+        if (System.getProperty("CCD0ApproxMultiplier") != null) {
+        	try {
+        		CCD0ApproxMultiplier = Integer.valueOf(System.getProperty("CCD0ApproxMultiplier"));
+        	} catch (NumberFormatException e) {
+        		progressStream.println("Could not parse CCD0ApproxMultiplier property (" + System.getProperty("CCD0ApproxMultiplier") + ").");
+        		CCD0ApproxMultiplier = 50;
+        		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
+        	}
+        }
+    
+        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, CCD0ApproxMultiplier * tree.getLeafNodeCount());
         ccd.setProgressStream(progressStream);
 
         int k = treeSet.totalTrees - treeSet.burninCount;
@@ -56,12 +66,12 @@ public class CCD0PointEstimate extends PointEstimate implements TopologySettingS
 
     @Override
     public String getServiceName() {
-        return "CCD0";
+        return "CCD0Approx";
     }
 
     @Override
     public String getDescription() {
-        return "MAP (CCD0)";
+        return "MAP (Approximate CCD0)";
     }
 
     @Override
@@ -71,4 +81,5 @@ public class CCD0PointEstimate extends PointEstimate implements TopologySettingS
         // but that would mean we do post-analysis work of the users
         return true;
     }
+
 }

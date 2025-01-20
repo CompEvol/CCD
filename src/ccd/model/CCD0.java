@@ -181,6 +181,19 @@ public class CCD0 extends AbstractCCD {
     }
 
     /**
+     * Constructor for an empty CDD. Trees can then be processed one by one that sets .
+     *
+     * @param numLeaves      number of leaves of the trees that this CCD will be based on
+     * @param storeBaseTrees whether to store the trees used to create this CCD;
+     *                       recommended not to when huge set of trees is used
+     * @param maxExpansionFactor
+     */
+    public CCD0(int numLeaves,  boolean storeBaseTrees, int maxExpansionFactor) {
+        super(numLeaves, storeBaseTrees);
+        this.maxExpansionFactor = maxExpansionFactor;
+    }
+
+    /**
      * Configure this CCD0 to try to speed up the expand step
      * by looking for monophyletic clades.
      */
@@ -335,6 +348,10 @@ public class CCD0 extends AbstractCCD {
         List<Clade> clades = cladesToExpand.sorted(Comparator.comparingInt(x -> x.size())).toList();
         if ((progressStream != null) && verbose) {
             progressStream.println("Expanding CCD0: processing " + clades.size() + " clades");
+            if (clades.size() > 100000 && maxExpansionFactor == -1) {
+            	progressStream.println("If this takes too long, consider using Approximated CCD0 instead.");
+            	progressStream.println("This generally runs faster and gives reasonably good point estimates.");
+            }
         }
 
         // 3. clade buckets
@@ -450,33 +467,16 @@ public class CCD0 extends AbstractCCD {
         }
 
         BitSet parentBits = parent.getCladeInBits();
-
-        // every clade split has a smaller child with size k_small and a larger child with
-        // size k_large such that k_small <= parent.size() / 2 < k_large
-
-        // we find out if we have fewer smaller or larger possible children and only look
-        // at the smaller half
-
-        int numPotentialSmallChildren = 0;
-        int numPotentialLargeChildren = 0;
-
-        for (int j = 1; j <= parent.size() / 2; j++) {
-            numPotentialSmallChildren += cladeBuckets.get(j - 1).size();
-            numPotentialLargeChildren += cladeBuckets.get(parent.size() - j - 1).size();
-        }
-
-        int minChildSize;
-        int maxChildSize;
-        if (numPotentialSmallChildren < numPotentialLargeChildren) {
-            minChildSize = 1;
-            maxChildSize = parent.size() / 2;
-        } else {
-            minChildSize = parent.size() / 2;
-            maxChildSize = parent.size() - 1;
-        }
-
-        for (int j = minChildSize; j <= maxChildSize; j++) {
-            for (Clade child : cladeBuckets.get(j - 1)) {
+        int parentSize = parent.size();
+        
+        for (int j = 1; j <= parentSize / 2; j++) {
+            // every clade split has a smaller child with size k_small and a larger child with
+            // size k_large such that k_small <= parent.size() / 2 < k_large
+        	// process the smallest bucket with one of these
+        	Set<Clade> bucket = cladeBuckets.get(j - 1).size() < cladeBuckets.get(parentSize - j - 1).size() ?
+        			cladeBuckets.get(j - 1) :
+        			cladeBuckets.get(parentSize - j - 1);
+            for (Clade child : bucket) {
                 if (done.contains(child)) {
                     continue;
                 }

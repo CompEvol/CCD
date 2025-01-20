@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 
-@Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
+@Description("TreeAnnotator plugin for setting the tree topology as CCD2 MAP tree")
 public class CCD2PointEstimate extends PointEstimate implements TopologySettingService {
 
     @Override
