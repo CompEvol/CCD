@@ -19,7 +19,7 @@ import java.io.PrintStream;
  * a CCD0, a CCD1, and a CCD2, and then picking the best model based on the Akaike information criterion (AIC).
  */
 
-@Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
+@Description("TreeAnnotator plugin for setting the tree topology as CCD MAP tree")
 public class CCDSelectionPointEstimate extends PointEstimate implements TopologySettingService {
 
     @Override
