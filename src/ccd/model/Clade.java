@@ -102,6 +102,11 @@ public class Clade {
     private double sumCladeCredibilities = -1;
 
     /**
+     * The log of sum of subtree clade credibilities of all trees rooted at this clade.
+     */
+    private double sumLogCladeCredibilities = 1;
+
+    /**
      * The probability of this clade appearing in a tree of the respective
      * distribution.
      */
@@ -300,6 +305,7 @@ public class Clade {
             this.maxSubtreeSumCladeCredibility = -1;
             this.entropy = -1;
             this.sumCladeCredibilities = -1;
+            this.sumLogCladeCredibilities = 1;
             this.probability = -1;
 
             for (CladePartition partition : partitions) {
@@ -551,17 +557,17 @@ public class Clade {
         }
 
         for (Clade parent : this.getParentClades()) {
-            parent.collectAncostorClades(ancestors);
+            parent.collectAncestorClades(ancestors);
         }
 
         return ancestors;
     }
 
     /* Recursive (upward) helper method */
-    private void collectAncostorClades(Set<Clade> ancestors) {
+    private void collectAncestorClades(Set<Clade> ancestors) {
         if (ancestors.add(this)) {
             for (Clade parent : this.getParentClades()) {
-                parent.collectAncostorClades(ancestors);
+                parent.collectAncestorClades(ancestors);
             }
         }
     }
@@ -804,7 +810,39 @@ public class Clade {
      *              this clade
      */
     public void setSumCladeCredibilities(double value) {
+        if (value < 0) {
+            throw new AssertionError("Sum clade credibilities cannot be negative, but requested value to set is: " + value);
+        }
         this.sumCladeCredibilities = value;
+    }
+
+    /**
+     * Reset the sum of clade credibilities to the default un-computed value of -1 (for non-leaf non-cherry clades).
+     */
+    public void resetSumCladeCredibilities() {
+        if (this.isLeaf()) {
+            this.sumCladeCredibilities = 1;
+        } else {
+            this.sumCladeCredibilities = -1;
+        }
+    }
+
+    /**
+     * @return if computed, log of sum of subtree clade credibilities of all subtrees rooted at this clade
+     */
+    public double getLogSumCladeCredibilities() {
+        return this.sumLogCladeCredibilities;
+    }
+
+    /**
+     * @param value sum of subtree clade credibilities of all subtrees rooted at
+     *              this clade
+     */
+    public void setLogSumCladeCredibilities(double value) {
+        if (value > 0) {
+            throw new AssertionError("Log probabilities must be non-positive.");
+        }
+        this.sumLogCladeCredibilities = value;
     }
 
     /**
