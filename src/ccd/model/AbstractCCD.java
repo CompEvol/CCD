@@ -1394,13 +1394,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     public void resetSumCladeCredibilities() {
         for (Clade clade : this.getClades()) {
-            if (clade.isLeaf()) {
-                clade.setSumCladeCredibilities(1);
-            } else if (clade.isCherry()) {
-                clade.setSumCladeCredibilities(clade.getCladeCredibility());
-            } else {
-                clade.setSumCladeCredibilities(-1);
-            }
+            clade.resetSumCladeCredibilities();
         }
     }
 

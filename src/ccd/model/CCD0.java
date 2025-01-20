@@ -67,7 +67,7 @@ public class CCD0 extends AbstractCCD {
     private Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
-    private PrintStream progressStream = System.out;
+    private PrintStream progressStream = null;
 
     /** Progress counted of clades handled in the expand step. */
     private int progressed = 0;
@@ -451,16 +451,38 @@ public class CCD0 extends AbstractCCD {
 
         BitSet parentBits = parent.getCladeInBits();
 
-        // otherwise we check if we find a larger partner clade for any
-        // smaller clade that together partition the parent clade;
-        for (int j = (int) Math.ceil(parent.size() / 2); j < parent.size(); j++) {
-            for (Clade largeChild : cladeBuckets.get(j - 1)) {
-                if (done.contains(largeChild)) {
+        // every clade split has a smaller child with size k_small and a larger child with
+        // size k_large such that k_small <= parent.size() / 2 < k_large
+
+        // we find out if we have fewer smaller or larger possible children and only look
+        // at the smaller half
+
+        int numPotentialSmallChildren = 0;
+        int numPotentialLargeChildren = 0;
+
+        for (int j = 1; j <= parent.size() / 2; j++) {
+            numPotentialSmallChildren += cladeBuckets.get(j - 1).size();
+            numPotentialLargeChildren += cladeBuckets.get(parent.size() - j - 1).size();
+        }
+
+        int minChildSize;
+        int maxChildSize;
+        if (numPotentialSmallChildren < numPotentialLargeChildren) {
+            minChildSize = 1;
+            maxChildSize = parent.size() / 2;
+        } else {
+            minChildSize = parent.size() / 2;
+            maxChildSize = parent.size() - 1;
+        }
+
+        for (int j = minChildSize; j <= maxChildSize; j++) {
+            for (Clade child : cladeBuckets.get(j - 1)) {
+                if (done.contains(child)) {
                     continue;
                 }
 
-                BitSet largerChildBits = largeChild.getCladeInBits();
-                findPartitionHelper(largeChild, parent, helperBits, parentBits, largerChildBits);
+                BitSet childBits = child.getCladeInBits();
+                findPartitionHelper(child, parent, helperBits, parentBits, childBits);
             }
         }
 
