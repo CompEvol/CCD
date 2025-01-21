@@ -5,6 +5,7 @@ import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
 import java.util.HashSet;
@@ -61,7 +62,7 @@ public class CCD0 extends AbstractCCD {
     private List<Clade> newClades = null;
 
     /** Clades organized by size for more efficient expand method. */
-    private List<Set<Clade>> cladeBuckets = null;
+    private List<List<Clade>> cladeBuckets = null;
 
     /** Clades already processed */
     private Set<Clade> done;
@@ -329,11 +330,16 @@ public class CCD0 extends AbstractCCD {
         this.probabilitiesDirty = false;
     }
 
+    
+    private int [][] from;
+
     /**
      * Expand CCD graph with clade partitions where parent and children were
      * observed, but not that clade partition.
      */
     private void expand() {
+//    	long start = System.currentTimeMillis();
+    	
         Stream<Clade> cladesToExpand = cladeMapping.values().stream();
 
         // 1. we only expand the most frequent clades if necessary
@@ -357,15 +363,39 @@ public class CCD0 extends AbstractCCD {
         // 3. clade buckets
         // for easier matching of child clades, we want to group them by size
         // 3.i init clade buckets
-        cladeBuckets = new ArrayList<Set<Clade>>(leafArraySize);
+        cladeBuckets = new ArrayList<>(leafArraySize);
         for (int i = 0; i < leafArraySize; i++) {
-            cladeBuckets.add(new HashSet<Clade>());
+            cladeBuckets.add(new ArrayList<Clade>());
         }
         // 3.ii fill clade buckets
         for (Clade clade : clades) {
             cladeBuckets.get(clade.size() - 1).add(clade);
         }
+        for (int i = 0; i < leafArraySize; i++) {
+            cladeBuckets.get(i).sort((o1,o2) -> o1.getCladeInBits().compareTo(o2.getCladeInBits()));
+        }
 
+        // 3.iii calculate from
+        from = new int[leafArraySize][leafArraySize];
+        for (int i = 0; i < leafArraySize; i++) {
+        	List<Clade> bucket = cladeBuckets.get(i);
+        	if (bucket.size() > 0) {
+	        	int j = 0;
+	        	int [] fromi = from[i];
+	        	for (int c = 0; c < bucket.size(); c++) {
+	        		Clade clade = bucket.get(c);
+	        		int min = clade.getCladeInBits().nextSetBit(0);
+	        		while (j <= min) {
+	        			fromi[j++] = c;
+	        		}
+	        	}
+	        	while (j < leafArraySize) {
+	        		fromi[j] = fromi[j-1];
+	        		j++;
+	        	}
+        	}
+        }        
+        
         // 4. find missing clade partitions
         done = new HashSet<>();
         threadCount = Runtime.getRuntime().availableProcessors();
@@ -398,6 +428,9 @@ public class CCD0 extends AbstractCCD {
         }
         // Log.warning("Expanded CCD0 in " + (end - start) / 1000 + " seconds.");
         progressStream = null;
+
+//        long end = System.currentTimeMillis();
+//        System.err.println("Expanded in " + (end-start) + " ms");
     }
 
     /**
@@ -468,15 +501,16 @@ public class CCD0 extends AbstractCCD {
 
         BitSet parentBits = parent.getCladeInBits();
         int parentSize = parent.size();
+		int min = parent.getCladeInBits().nextSetBit(0);
         
         for (int j = 1; j <= parentSize / 2; j++) {
             // every clade split has a smaller child with size k_small and a larger child with
             // size k_large such that k_small <= parent.size() / 2 < k_large
         	// process the smallest bucket with one of these
-        	Set<Clade> bucket = cladeBuckets.get(j - 1).size() < cladeBuckets.get(parentSize - j - 1).size() ?
-        			cladeBuckets.get(j - 1) :
-        			cladeBuckets.get(parentSize - j - 1);
-            for (Clade child : bucket) {
+        	int bucketIndex = cladeBuckets.get(j - 1).size() - from[j-1][min] < cladeBuckets.get(parentSize - j - 1).size() - from[parentSize -j-1][min]? j-1 : parentSize -j-1; 
+        	List<Clade> bucket = cladeBuckets.get(bucketIndex);
+            for (int i = from[bucketIndex][min]; i < bucket.size(); i++) {
+            	Clade child = bucket.get(i);
                 if (done.contains(child)) {
                     continue;
                 }

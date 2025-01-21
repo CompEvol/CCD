@@ -9,7 +9,7 @@ package ccd.model;
  *
  * @author Remco Bouckaert, Jonathan Klawitter
  */
-public class BitSet implements Cloneable {
+public class BitSet implements Cloneable, Comparable<BitSet> {
 
     /**
      * The internal field corresponding to the serialField "bits".
@@ -501,4 +501,13 @@ public class BitSet implements Cloneable {
 
         return true;
     }
+
+	@Override
+	public int compareTo(BitSet other) {
+		int i = nextSetBit(0);
+		int j = other.nextSetBit(0);
+		if (i < j) return -1;
+		if (i > j) return 1;
+		return 0;
+	}
 }
