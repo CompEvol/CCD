@@ -14,7 +14,9 @@ import ccd.model.HeightSettingStrategy;
 
 @Description("TreeAnnotator plugin for setting the tree topology as CCD1 MAP tree")
 public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySettingService {
-
+	// default used to cap number of clades considered to DEFAULT_MULTIPLIER x number of taxa
+	final static int DEFAULT_MULTIPLIER = 100;
+	
     @Override
     public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
             throws IOException {
@@ -26,18 +28,18 @@ public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySe
         treeSet.reset();
         Tree tree = treeSet.next();
         Tree firstTree = tree;
-        int CCD0ApproxMultiplier = 50;
+        int CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
         if (System.getProperty("CCD0ApproxMultiplier") != null) {
         	try {
         		CCD0ApproxMultiplier = Integer.valueOf(System.getProperty("CCD0ApproxMultiplier"));
         	} catch (NumberFormatException e) {
         		progressStream.println("Could not parse CCD0ApproxMultiplier property (" + System.getProperty("CCD0ApproxMultiplier") + ").");
-        		CCD0ApproxMultiplier = 50;
+        		CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
         		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
         	}
         }
     
-        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, CCD0ApproxMultiplier * tree.getLeafNodeCount());
+        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, CCD0ApproxMultiplier);
         ccd.setProgressStream(progressStream);
 
         int k = treeSet.totalTrees - treeSet.burninCount;
