@@ -1,10 +1,10 @@
 ## CCD Package for [BEAST 2](https://www.beast2.org/)
 
-Implementation of the conditional clade distribution (CCD), which offers an estimates of the posterior tree (topology) distribution learned from the sample, as well as associated tools and algorithms.
+Implementation of the conditional clade distribution (CCD), which offers estimators of the posterior tree (topology) distribution learned from the sample, as well as associated tools and algorithms.
 Three parametrisations of a CCD are implemented, namely, based on clade frequencies (CCD0), clade split frequencies (CCD1), and pairs of clade split frequencies (CCD2).
 Furthermore, point estimators based on the CCDs are implemented,
-which allows TreeAnnotator to produce better summary trees than via MCC trees (which is restricted to the sample).
-The package further incldues tools for entropy-based rogue analysis and rogue removal.
+which allows TreeAnnotator to produce better summary trees than the MCC tree method (which is restricted to the sample).
+The package further includes tools for entropy-based rogue analysis and rogue removal.
 
 See the [CCD-Research repository](https://github.com/CompEvol/CCD-Research) for information, scripts, and data of the associated research papers,
 and see the instructions below on how to use the tools.
