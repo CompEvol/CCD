@@ -293,6 +293,6 @@ public class BitSet64 extends BitSet {
     
     @Override
     public int lastSetBit() {
-        return Long.numberOfLeadingZeros(word1)-1;
+        return BITS_PER_WORD - Long.numberOfLeadingZeros(word1) - 1;
     }
 }

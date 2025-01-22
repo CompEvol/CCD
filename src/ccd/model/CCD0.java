@@ -468,9 +468,9 @@ public class CCD0 extends AbstractCCD {
 	        			fromi[j++] = c;
 	        		}
 	        		int max = clade.getCladeInBits().lastSetBit();
-	        		if (max < 0) {
-	        			max = clade.getCladeInBits().lastSetBit();
-	        		}
+//	        		if (max < 0 || max >= toi.length) {
+//	        			max = clade.getCladeInBits().lastSetBit();
+//	        		}
 	        		toi[max] = c;
 	        	}
 	        	while (j < leafArraySize) {
