@@ -62,6 +62,17 @@ public class CCD0 extends AbstractCCD {
 
     /** Clades organized by size for more efficient expand method. */
     private List<List<Clade>> cladeBuckets = null;
+    
+    /** 
+     * from[i][j] is the first clade in cladeBuckets[i] that has bit j set.
+     * to[i][j] is the last clade in cladeBuckets[i] that has bit j set.
+     * To test if cladeBuckets[i] contains sub-clades of some clade C
+     * only clades cladeBuckets[i][from[i][first set bit in C]] up to and including
+     * cladeBuckets[i][to[i][last set bit in C]] need to be checked. 
+     * All others have at least one taxon outside C: the clades below from[i][] 
+     * have a taxon below any taxon in C and the clades above to[i][] have one above.
+     */
+    private int [][] from, to;
 
     /** Clades already processed */
     private Set<Clade> done;
@@ -84,6 +95,7 @@ public class CCD0 extends AbstractCCD {
     /** Number of worker threads used for the expand step. */
     private int threadCount = 1;
     private CountDownLatch countDown = null;
+
 
     /* -- CONSTRUCTORS & CONSTRUCTION METHODS -- */
 
@@ -329,15 +341,12 @@ public class CCD0 extends AbstractCCD {
         this.probabilitiesDirty = false;
     }
 
-    
-    private int [][] from, to;
-
     /**
      * Expand CCD graph with clade partitions where parent and children were
      * observed, but not that clade partition.
      */
     private void expand() {
-    	long start = System.currentTimeMillis();
+    	// long start = System.currentTimeMillis();
     	
         Stream<Clade> cladesToExpand = cladeMapping.values().stream();
 
@@ -361,67 +370,8 @@ public class CCD0 extends AbstractCCD {
 
         // 3. clade buckets
         // for easier matching of child clades, we want to group them by size
-        // 3.i init clade buckets
-        cladeBuckets = new ArrayList<>(leafArraySize);
-        for (int i = 0; i < leafArraySize; i++) {
-            cladeBuckets.add(new ArrayList<Clade>());
-        }
-        // 3.ii fill clade buckets
-        for (Clade clade : clades) {
-            cladeBuckets.get(clade.size() - 1).add(clade);
-        }
-        // sort buckets by first set bit, then last set bit -- ignore intermediate bits
-        for (int i = 0; i < leafArraySize; i++) {
-            cladeBuckets.get(i).sort((o1,o2) -> {
-            	final BitSet b1 = o1.getCladeInBits();
-            	final BitSet b2 = o2.getCladeInBits();
-        		final int firstBit1 = b1.nextSetBit(0);
-        		final int firstBit2 = b2.nextSetBit(0);
-        		if (firstBit1 < firstBit2) return -1;
-        		if (firstBit1 > firstBit2) return 1;
-        		final int lastBit1 = b1.lastSetBit();
-        		final int lastBit2 = b2.lastSetBit();
-        		if (lastBit1 < lastBit2) return -1;
-        		if (lastBit1 > lastBit2) return 1;
-        		return 0;
-            });
-        }
-
-        // 3.iii calculate from and to ranges
-        from = new int[leafArraySize][leafArraySize];
-        to = new int[leafArraySize][leafArraySize];
-        for (int i = 0; i < leafArraySize; i++) {
-        	List<Clade> bucket = cladeBuckets.get(i);
-        	if (bucket.size() > 0) {
-	        	int j = 0;
-	        	int [] fromi = from[i];
-	        	int [] toi = to[i];
-	        	for (int c = 0; c < bucket.size(); c++) {
-	        		Clade clade = bucket.get(c);
-	        		int min = clade.getCladeInBits().nextSetBit(0);
-	        		while (j <= min) {
-	        			fromi[j++] = c;
-	        		}
-	        		int max = clade.getCladeInBits().lastSetBit();
-	        		toi[max] = c;
-	        	}
-	        	while (j < leafArraySize) {
-	        		fromi[j] = fromi[j-1];
-	        		j++;
-	        	}
-	        	
-	        	toi[leafArraySize - 1] = bucket.size() - 1;
-	        	for (int k = leafArraySize - 2; k >= 0; k--) {
-	        		if (toi[k] == 0) {
-	        			toi[k] = toi[k+1];
-	        		}
-	        	}
-	        	for (int k = 1; k < leafArraySize; k++) {
-	        		toi[k] = Math.max(toi[k-1], toi[k]);
-	        	}
-        	}
-        }
-        
+        cladeBuckets = processCladeBuckets(clades, leafArraySize);
+ 
         // 4. find missing clade partitions
         done = new HashSet<>();
         threadCount = Runtime.getRuntime().availableProcessors();
@@ -455,11 +405,94 @@ public class CCD0 extends AbstractCCD {
         // Log.warning("Expanded CCD0 in " + (end - start) / 1000 + " seconds.");
         progressStream = null;
 
-        long end = System.currentTimeMillis();
-        System.err.println("Expanded in " + (end-start) + " ms");
+        // release memory
+        from = null;
+        to = null;
+        // long end = System.currentTimeMillis();
+        // System.err.println("Expanded in " + (end-start) + " ms");
     }
 
-    /**
+    
+    /** set up clade buckets so that
+     * 1. each bucket contains clades of the same size
+     * 2. clades are sorted by first set bit, then last set bit
+     * 3. as a side effect, the from[][] and to[][] arrays are initialised
+     * 
+     * @param clades set of clades to distribute into clade buckets
+     * @param leafArraySize = maximum clade size
+     * @return clade buckets
+     */
+    private List<List<Clade>> processCladeBuckets(List<Clade> clades, int leafArraySize) {
+        List<List<Clade>> cladeBuckets = new ArrayList<>(leafArraySize);
+
+        // 3.i init clade buckets
+        for (int i = 0; i < leafArraySize; i++) {
+            cladeBuckets.add(new ArrayList<Clade>());
+        }
+        
+        // 3.ii fill clade buckets
+        for (Clade clade : clades) {
+            cladeBuckets.get(clade.size() - 1).add(clade);
+        }
+        
+        // 3.iii sort buckets by first set bit, then last set bit -- ignore intermediate bits
+        for (int i = 0; i < leafArraySize; i++) {
+            cladeBuckets.get(i).sort((o1,o2) -> {
+            	final BitSet b1 = o1.getCladeInBits();
+            	final BitSet b2 = o2.getCladeInBits();
+        		final int firstBit1 = b1.nextSetBit(0);
+        		final int firstBit2 = b2.nextSetBit(0);
+        		if (firstBit1 < firstBit2) return -1;
+        		if (firstBit1 > firstBit2) return 1;
+        		final int lastBit1 = b1.lastSetBit();
+        		final int lastBit2 = b2.lastSetBit();
+        		if (lastBit1 < lastBit2) return -1;
+        		if (lastBit1 > lastBit2) return 1;
+        		return 0;
+            });
+        }
+
+        // 3.iv calculate from and to ranges
+        from = new int[leafArraySize][leafArraySize];
+        to = new int[leafArraySize][leafArraySize];
+        for (int i = 0; i < leafArraySize; i++) {
+        	List<Clade> bucket = cladeBuckets.get(i);
+        	if (bucket.size() > 0) {
+	        	int j = 0;
+	        	int [] fromi = from[i];
+	        	int [] toi = to[i];
+	        	for (int c = 0; c < bucket.size(); c++) {
+	        		Clade clade = bucket.get(c);
+	        		int min = clade.getCladeInBits().nextSetBit(0);
+	        		while (j <= min) {
+	        			fromi[j++] = c;
+	        		}
+	        		int max = clade.getCladeInBits().lastSetBit();
+	        		if (max < 0) {
+	        			max = clade.getCladeInBits().lastSetBit();
+	        		}
+	        		toi[max] = c;
+	        	}
+	        	while (j < leafArraySize) {
+	        		fromi[j] = fromi[j-1];
+	        		j++;
+	        	}
+	        	
+	        	toi[leafArraySize - 1] = bucket.size() - 1;
+	        	for (int k = leafArraySize - 2; k >= 0; k--) {
+	        		if (toi[k] == 0) {
+	        			toi[k] = toi[k+1];
+	        		}
+	        	}
+	        	for (int k = 1; k < leafArraySize; k++) {
+	        		toi[k] = Math.max(toi[k-1], toi[k]);
+	        	}
+        	}
+        }
+        return cladeBuckets;
+   	}
+
+	/**
      * Like {@link CCD0#expand()}, expand CCD graph with clade partitions where parent (considering only new clades) and children were
      * observed, but not that clade partition.
      */
