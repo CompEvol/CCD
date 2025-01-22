@@ -290,4 +290,9 @@ public class BitSet64 extends BitSet {
         BitSet64 otherset = ((BitSet64) other);
         return (word1 & otherset.word1) == 0;
     }
+    
+    @Override
+    public int lastSetBit() {
+        return Long.numberOfLeadingZeros(word1)-1;
+    }
 }
