@@ -1,6 +1,6 @@
 <package name='CCD' version='1.0.2'>
-	<depends on='BEAST.base' atleast='2.7.5'/>
-	<depends on='BEAST.app' atleast='2.7.5'/>
+	<depends on='BEAST.base' atleast='2.7.7'/>
+	<depends on='BEAST.app' atleast='2.7.7'/>
 
     <service type="beastfx.app.treeannotator.services.TopologySettingService">
         <provider classname="ccd.tools.CCD0PointEstimate"/>
