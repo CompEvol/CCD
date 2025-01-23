@@ -29,6 +29,7 @@ public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySe
         Tree tree = treeSet.next();
         Tree firstTree = tree;
         int CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
+        
         if (System.getProperty("CCD0ApproxMultiplier") != null) {
         	try {
         		CCD0ApproxMultiplier = Integer.valueOf(System.getProperty("CCD0ApproxMultiplier"));
@@ -37,7 +38,15 @@ public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySe
         		CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
         		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
         	}
-        }
+        } else if (System.getenv("CCD0ApproxMultiplier") != null) {
+        	try {
+        		CCD0ApproxMultiplier = Integer.valueOf(System.getenv("CCD0ApproxMultiplier"));
+        	} catch (NumberFormatException e) {
+        		progressStream.println("Could not parse CCD0ApproxMultiplier property (" + System.getenv("CCD0ApproxMultiplier") + ").");
+        		CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
+        		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
+        	}
+        } 
     
         CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, CCD0ApproxMultiplier);
         ccd.setProgressStream(progressStream);

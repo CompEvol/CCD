@@ -347,6 +347,9 @@ public class CCD0 extends AbstractCCD {
      */
     private void expand() {
     	// long start = System.currentTimeMillis();
+    	if (this.maxExpansionFactor <= 0) {
+    		return;
+    	}
     	
         Stream<Clade> cladesToExpand = cladeMapping.values().stream();
 
