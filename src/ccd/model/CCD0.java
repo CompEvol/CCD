@@ -337,7 +337,9 @@ public class CCD0 extends AbstractCCD {
      * observed, but not that clade partition.
      */
     private void expand() {
-    	long start = System.currentTimeMillis();
+    	if (maxExpansionFactor == 0) return;
+
+        long start = System.currentTimeMillis();
     	
         Stream<Clade> cladesToExpand = cladeMapping.values().stream();
 
