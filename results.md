@@ -49,7 +49,7 @@
 | Method               | log(MCC)      | Runtime |
 | -------------------- | ------------- | ------- |
 | CCD1                 | -58636.38     | 150s    |
-| HIPSTR               | -57546.68     | **85s** |
+| HIPSTR               | -51352.61     | **85s** |
 | CCD0: no expansion   | -51399.93     | 144s    |
 | CCD0: 50n expansion  | -50785.12     | 18min   |
 | CCD0: 100n expansion | -50458.26     | 77min   |

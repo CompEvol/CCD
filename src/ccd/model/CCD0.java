@@ -169,6 +169,11 @@ public class CCD0 extends AbstractCCD {
         initialize();
     }
 
+    public CCD0(int numLeaves, int maxExpansionFactor) {
+        super(numLeaves, false);
+        this.maxExpansionFactor = maxExpansionFactor;
+    }
+
     /**
      * Constructor for an empty CDD. Trees can then be processed one by one.
      *
