@@ -76,7 +76,7 @@ public class Clade {
     /**
      * Computed max CCP of any subtree with the root on this clade.
      */
-    private double maxSubtreeCCP = -1;
+    private double maxSubtreeLogCCP = 1;
 
     /**
      * The partition of this clade realized by the subtree rooted at this clade
@@ -141,7 +141,7 @@ public class Clade {
         this.childClades = new ArrayList<Clade>(8);
 
         if (size == 1) {
-            this.maxSubtreeCCP = 1;
+            this.maxSubtreeLogCCP = 0;
             this.maxSubtreeSumCladeCredibility = 1;
             this.probability = 1;
             this.sumCladeCredibilities = 1;
@@ -301,7 +301,7 @@ public class Clade {
                 this.maxSubtreeSumCladeCredibilityPartition = null;
                 this.numTopologies = null;
             }
-            this.maxSubtreeCCP = -1;
+            this.maxSubtreeLogCCP = 1;
             this.maxSubtreeSumCladeCredibility = -1;
             this.entropy = -1;
             this.sumCladeCredibilities = -1;
@@ -656,14 +656,14 @@ public class Clade {
     }
 
     /**
-     * @return max CCP of any subtree rooted at this clade
+     * @return max log CCP of any subtree rooted at this clade.
      */
-    public double getMaxSubtreeCCP() {
-        if (this.maxSubtreeCCP < 0) {
-            this.computeMaxSubtreeCCP();
+    public double getMaxSubtreeLogCCP() {
+        if (this.maxSubtreeLogCCP > 0) {
+            this.computeMaxSubtreeLogCCP();
         }
 
-        return maxSubtreeCCP;
+        return maxSubtreeLogCCP;
     }
 
     /**
@@ -674,8 +674,8 @@ public class Clade {
      * @return partition realized in max CCP subtree rooted at this clade
      */
     public CladePartition getMaxSubtreeCCPPartition() {
-        if ((this.maxSubtreeCCPPartition == null) || (this.maxSubtreeCCP < 0)) {
-            this.computeMaxSubtreeCCP();
+        if ((this.maxSubtreeCCPPartition == null) || (this.maxSubtreeLogCCP > 0)) {
+            this.computeMaxSubtreeLogCCP();
         }
 
         return maxSubtreeCCPPartition;
@@ -686,24 +686,24 @@ public class Clade {
      * maximizes the conditional clade probability; so this maximizes the
      * probability recursively.
      */
-    private void computeMaxSubtreeCCP() {
+    private void computeMaxSubtreeLogCCP() {
         // for a single non-leaf clade, to find the max probability subtree we
         // only have to pick the partition of this clade with max probability in
         // its two subtrees
         for (CladePartition partition : partitions) {
-            double partitionMaxCCP = partition.getMaxSubtreeCCP();
+            double partitionMaxLogCCP = partition.getMaxSubtreeLogCCP();
 
-            if (partitionMaxCCP > maxSubtreeCCP) {
-                maxSubtreeCCP = partitionMaxCCP;
+            if (partitionMaxLogCCP > maxSubtreeLogCCP) {
+                maxSubtreeLogCCP = partitionMaxLogCCP;
                 maxSubtreeCCPPartition = partition;
-            } else if (partitionMaxCCP == maxSubtreeCCP) {
+            } else if (partitionMaxLogCCP == maxSubtreeLogCCP) {
                 // System.out.println("Tie found for computeMaxSubtreeccd.");
                 Clade smallCladeMax = maxSubtreeCCPPartition.getSmallerChild();
                 Clade smallCladeCurrent = partition.getSmallerChild();
 
                 // we pick the more balanced partition
                 if (smallCladeMax.size() < smallCladeCurrent.size()) {
-                    maxSubtreeCCP = partitionMaxCCP;
+                    maxSubtreeLogCCP = partitionMaxLogCCP;
                     maxSubtreeCCPPartition = partition;
                 } else if (smallCladeMax.size() == smallCladeCurrent.size()) {
                     // but if they are equally balanced, then decide lexicographically which partition to pick
@@ -719,7 +719,7 @@ public class Clade {
 
                     BitSet bitsSmaller = BitSetUtil.getLexicographicFirst(bitsMax, bitsCurrent);
                     if (bitsCurrent == bitsSmaller) {
-                        maxSubtreeCCP = partitionMaxCCP;
+                        maxSubtreeLogCCP = partitionMaxLogCCP;
                         maxSubtreeCCPPartition = partition;
                     }
                 }

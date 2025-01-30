@@ -931,12 +931,26 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return vertex;
     }
 
+    /**
+     * Returns the probability of the most likely tree. Note that this can
+     * underflow for large trees. It is recommended to use {@link #getMaxLogTreeProbability()}
+     * instead.
+     *
+     * @return probability of the most likely tree.
+     */
     @Override
     public double getMaxTreeProbability() {
+        return Math.exp(this.getMaxLogTreeProbability());
+    }
+
+    /**
+     * @return the log probability of the most likely tree.
+     */
+    public double getMaxLogTreeProbability() {
         tidyUpCacheIfDirty();
         resetCacheIfProbabilitiesDirty();
 
-        return this.rootClade.getMaxSubtreeCCP();
+        return this.rootClade.getMaxSubtreeLogCCP();
     }
 
     /* Helper method */

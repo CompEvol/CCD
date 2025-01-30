@@ -43,10 +43,10 @@ public class CladePartition {
     private double ccp = -1;
 
     /**
-     * The maximum CCP of the subtree with the root on the parent clade and that
+     * The maximum log CCP of the subtree with the root on the parent clade and that
      * realizes this partition.
      */
-    private double maxCCP = -1;
+    private double maxSubtreeLogCCP = -1;
 
     /** Number of different tree topologies with this partition at the root. */
     private BigInteger numTopologies = null;
@@ -90,7 +90,7 @@ public class CladePartition {
 
     /** Resets cached computed values. */
     public void resetCachedValues() {
-        this.maxCCP = -1;
+        this.maxSubtreeLogCCP = 1;
         this.numTopologies = null;
     }
 
@@ -371,22 +371,22 @@ public class CladePartition {
     }
 
     /**
-     * Computes and returns the maximum conditional clade probability (CCP) of
+     * Computes and returns the maximum conditional log clade probability (CCP) of
      * the subtree with the root on the parent clade and that realizes this
      * partition.
      *
-     * @return maximum probability of subtree realizing this partition
+     * @return maximum log probability of subtree realizing this partition
      */
-    public double getMaxSubtreeCCP() {
-        if (this.maxCCP < 0) {
-            maxCCP = this.getCCP();
+    public double getMaxSubtreeLogCCP() {
+        if (this.maxSubtreeLogCCP > 0) {
+            maxSubtreeLogCCP = this.getLogCCP();
 
             for (Clade clade : childClades) {
-                maxCCP *= clade.getMaxSubtreeCCP();
+                maxSubtreeLogCCP += clade.getMaxSubtreeLogCCP();
             }
         }
 
-        return maxCCP;
+        return maxSubtreeLogCCP;
     }
 
     /**
