@@ -693,7 +693,7 @@ public class Clade {
         for (CladePartition partition : partitions) {
             double partitionMaxLogCCP = partition.getMaxSubtreeLogCCP();
 
-            if (partitionMaxLogCCP > maxSubtreeLogCCP) {
+            if (partitionMaxLogCCP > maxSubtreeLogCCP || maxSubtreeLogCCP > 0) {
                 maxSubtreeLogCCP = partitionMaxLogCCP;
                 maxSubtreeCCPPartition = partition;
             } else if (partitionMaxLogCCP == maxSubtreeLogCCP) {

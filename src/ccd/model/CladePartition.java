@@ -46,7 +46,7 @@ public class CladePartition {
      * The maximum log CCP of the subtree with the root on the parent clade and that
      * realizes this partition.
      */
-    private double maxSubtreeLogCCP = -1;
+    private double maxSubtreeLogCCP = 1;
 
     /** Number of different tree topologies with this partition at the root. */
     private BigInteger numTopologies = null;
