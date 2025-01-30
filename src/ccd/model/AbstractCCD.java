@@ -959,16 +959,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
         switch (samplingStrategy) {
             case MAP: {
                 partition = clade.getMaxSubtreeCCPPartition();
-
-                // check if partition tied with others
-                /*-
-                ArrayList<CladePartition> partitions = clade.getPartitions();
-                for (CladePartition cladePartition : partitions) {
-                    if ((cladePartition != partition)
-                            && (cladePartition.getMaxSubtreeCCP() == partition.getMaxSubtreeCCP())) {
-                        out.println(" -!- tie in choice of max recursive probability tree");
-                    }
-                }*/
                 break;
             }
             case Sampling: {
