@@ -318,18 +318,12 @@ public class CCD0 extends AbstractCCD {
         // then need to set clade partition probabilities
         // which normalizes the product of clade probabilities
         // out.print("setting probabilities ... ");
-        if (this.useLogProbabilities) {
+        try {
+            setPartitionProbabilities(this.rootClade);
+        } catch (UnderflowException exception) {
+            System.err.println("An underflow was detected. We switch to log space.");
+            this.resetSumCladeCredibilities();
             setPartitionLogProbabilities(this.rootClade);
-        } else {
-
-            try {
-                setPartitionProbabilities(this.rootClade);
-            } catch (UnderflowException exception) {
-                System.err.println("An underflow was detected. We switch to log space.");
-                this.resetSumCladeCredibilities();
-                setPartitionLogProbabilities(this.rootClade);
-            }
-
         }
 
         // out.println(" ...done.");
