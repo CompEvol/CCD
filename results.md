@@ -1,5 +1,7 @@
 # Results of Limited CCD0 Expansion
 
+Keep in mind that the runtime is an approximate measure, as it can vary significantly depending on the specific machine.
+
 ## EBOV (516)
 
 | Method               | log(MCC)    | Runtime |
@@ -29,7 +31,7 @@
 | CCD1                 | -3543.36     | 194s    |
 | HIPSTR               | -1786.64     | **81s** |
 | CCD0: no expansion   | -1786.64     | 228s    |
-| CCD0: 50n expansion  | 1775.41      | 204s    |
+| CCD0: 50n expansion  | -1775.41     | 204s    |
 | CCD0: 100n expansion | -1774.31     | 204s    |
 | CCD0                 | **-1760.87** | 6min    |
 
@@ -51,6 +53,6 @@
 | CCD1                 | -58636.38     | 150s    |
 | HIPSTR               | -51352.61     | **85s** |
 | CCD0: no expansion   | -51352.61     | 146s    |
-| CCD0: 50n expansion  | -50785.12     | 18min   |
+| CCD0: 50n expansion  | -50743.81     | 24min   |
 | CCD0: 100n expansion | -50418.37     | 82min   |
 | CCD0                 | **-49836.26** | 9h      |
