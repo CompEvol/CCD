@@ -12,43 +12,22 @@ import ccd.model.AbstractCCD;
 import ccd.model.CCD0;
 import ccd.model.HeightSettingStrategy;
 
-@Description("TreeAnnotator plugin for setting the tree topology as CCD0 MAP tree")
-public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySettingService {
-	// default used to cap number of clades considered to DEFAULT_MULTIPLIER x number of taxa
-	final static int DEFAULT_MULTIPLIER = 100;
+@Description("TreeAnnotator plugin for setting the tree topology as HIPSTR tree = CCD0 MAP tree without expand ")
+public class HIPSTR extends PointEstimate implements TopologySettingService {
 	
     @Override
     public Tree setTopology(TreeSet treeSet, PrintStream progressStream, TreeAnnotator annotator)
             throws IOException {
 
-        progressStream.println("CCD0Approx MAP tree computation");
+        progressStream.println("HIPSTR tree computation");
         progressStream.println("0              25             50             75            100");
         progressStream.println("|--------------|--------------|--------------|--------------|");
 
         treeSet.reset();
         Tree tree = treeSet.next();
         Tree firstTree = tree;
-        int CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
-        
-        if (System.getProperty("CCD0ApproxMultiplier") != null) {
-        	try {
-        		CCD0ApproxMultiplier = Integer.valueOf(System.getProperty("CCD0ApproxMultiplier"));
-        	} catch (NumberFormatException e) {
-        		progressStream.println("Could not parse CCD0ApproxMultiplier property (" + System.getProperty("CCD0ApproxMultiplier") + ").");
-        		CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
-        		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
-        	}
-        } else if (System.getenv("CCD0ApproxMultiplier") != null) {
-        	try {
-        		CCD0ApproxMultiplier = Integer.valueOf(System.getenv("CCD0ApproxMultiplier"));
-        	} catch (NumberFormatException e) {
-        		progressStream.println("Could not parse CCD0ApproxMultiplier property (" + System.getenv("CCD0ApproxMultiplier") + ").");
-        		CCD0ApproxMultiplier = DEFAULT_MULTIPLIER;
-        		progressStream.println("Using default value of " + CCD0ApproxMultiplier + ".");
-        	}
-        } 
     
-        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, CCD0ApproxMultiplier);
+        CCD0 ccd = new CCD0(tree.getLeafNodeCount(), false, 0);
         ccd.setProgressStream(progressStream);
 
         int k = treeSet.totalTrees - treeSet.burninCount;
@@ -77,17 +56,17 @@ public class CCD0ApproxPointEstimate extends PointEstimate implements TopologySe
 
     @Override
     public String getServiceName() {
-        return "CCD0Approx";
+        return "HIPSTR";
     }
 
     @Override
     public String getDescription() {
-        return "MAP (Approximate CCD0)";
+        return "HIPSTR (CCD0 without expansion)";
     }
 
     @Override
     protected boolean sanityCheck(Tree mapTree, Tree firstTree, AbstractCCD ccd) {
-        // nothing to do for CCD0 MAP tree
+        // nothing to do for HIPSTR tree
         // could analyse singly supported clades,
         // but that would mean we do post-analysis work of the users
         return true;

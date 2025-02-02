@@ -1,4 +1,4 @@
-<package name='CCD' version='1.0.2'>
+<package name='CCD' version='1.0.4'>
 	<depends on='BEAST.base' atleast='2.7.7'/>
 	<depends on='BEAST.app' atleast='2.7.7'/>
 
@@ -7,6 +7,7 @@
         <provider classname="ccd.tools.CCD1PointEstimate"/>
         <provider classname="ccd.tools.CCD2PointEstimate"/>
         <provider classname="ccd.tools.CCD0ApproxPointEstimate"/>
+        <provider classname="ccd.tools.HIPSTR"/>
     </service>
 
     <packageapp description="Entropy Calculator" class="ccd.tools.EntropyCalculator" args=""/>
