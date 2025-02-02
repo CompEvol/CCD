@@ -40,7 +40,7 @@
 | CCD1                 | -11540.45    | 65s     |
 | HIPSTR               | -8630.85     | **21s** |
 | CCD0: no expansion   | -8630.85     | 57s     |
-| CCD0: 50n expansion  | -8470.35     | 86s     |
+| CCD0: 50n expansion  | -8331.23     | 90s     |
 | CCD0: 100n expansion | -8327.63     | 147s    |
 | CCD0                 | **-8325.58** | 6min   |
 
