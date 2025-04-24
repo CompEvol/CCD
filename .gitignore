@@ -1,0 +1,6 @@
+CCD.iml
+build/
+release/
+
+# OS X ignores
+.DS_Store
