@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
@@ -13,6 +14,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 
+@Citation(value = "Berling and Klawitter et al. (2025). PLOS Computational Biology.\n" +
+        "Accurate Bayesian phylogenetic point estimation using a tree distribution parameterized by clade probabilities.",
+        DOI = "https://doi.org/10.1371/journal.pcbi.1012789")
 @Description("TreeAnnotator plugin for setting the tree topology as CCD0 MAP tree")
 public class CCD0PointEstimate extends PointEstimate implements TopologySettingService {
 

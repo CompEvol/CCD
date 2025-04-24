@@ -3,6 +3,7 @@ package ccd.tools;
 import java.io.IOException;
 import java.io.PrintStream;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
@@ -12,6 +13,10 @@ import ccd.model.AbstractCCD;
 import ccd.model.CCD0;
 import ccd.model.HeightSettingStrategy;
 
+
+@Citation(value = "Baele et al. (2024). bioRxiv.\n" +
+        "HIPSTR: highest independent posterior subtree reconstruction in TreeAnnotator X.",
+        DOI = "https://doi.org/10.1101/2024.12.08.627395")
 @Description("TreeAnnotator plugin for setting the tree topology as HIPSTR tree = CCD0 MAP tree without expand ")
 public class HIPSTR extends PointEstimate implements TopologySettingService {
 	

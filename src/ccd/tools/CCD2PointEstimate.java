@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
@@ -16,6 +17,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 
+@Citation(value = "Berling and Klawitter et al. (2025). PLOS Computational Biology.\n" +
+        "Accurate Bayesian phylogenetic point estimation using a tree distribution parameterized by clade probabilities.",
+        DOI = "https://doi.org/10.1371/journal.pcbi.1012789")
 @Description("TreeAnnotator plugin for setting the tree topology as CCD2 MAP tree")
 public class CCD2PointEstimate extends PointEstimate implements TopologySettingService {
 
@@ -57,7 +61,7 @@ public class CCD2PointEstimate extends PointEstimate implements TopologySettingS
 
     @Override
     public String getServiceName() {
-        return "CCD1";
+        return "CCD2";
     }
 
     @Override
