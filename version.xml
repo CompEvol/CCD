@@ -10,6 +10,7 @@
         <provider classname="ccd.tools.HIPSTR"/>
     </service>
 
+    <packageapp description="CCD Sampler" class="ccd.tools.CCDSampler" args=""/>
     <packageapp description="Entropy Calculator" class="ccd.tools.EntropyCalculator" args=""/>
     <packageapp description="Skeleton Analysis" class="ccd.tools.SkeletonAnalysis" args=""/>
     <packageapp description="Rogue Analysis" class="ccd.tools.RogueAnalysis" args=""/>
