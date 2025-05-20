@@ -5,9 +5,9 @@ import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeUtils;
 import ccd.model.AbstractCCD;
-import ccd.model.BitSet;
 import ccd.model.CCD2;
 import ccd.model.Clade;
+import ccd.model.bitsets.BitSet;
 
 import java.text.DecimalFormat;
 

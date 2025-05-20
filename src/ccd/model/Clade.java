@@ -1,6 +1,7 @@
 package ccd.model;
 
 import ccd.algorithms.BitSetUtil;
+import ccd.model.bitsets.BitSet;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -80,7 +81,7 @@ public class Clade {
 
     /**
      * The partition of this clade realized by the subtree rooted at this clade
-     * with max ccd.
+     * with max CCP.
      */
     private CladePartition maxSubtreeCCPPartition = null;
 
@@ -219,8 +220,7 @@ public class Clade {
      *                         clades
      * @return a new clade partition based on the two given child clades
      */
-    public CladePartition createCladePartition(Clade firstChildClade, Clade secondChildClade,
-                                               boolean storeParent) {
+    public CladePartition createCladePartition(Clade firstChildClade, Clade secondChildClade, boolean storeParent) {
         Clade[] partitioningClades = new Clade[]{firstChildClade, secondChildClade};
 
         CladePartition newPartition = new CladePartition(this, partitioningClades);
@@ -835,12 +835,36 @@ public class Clade {
     }
 
     /**
+     * @return the newly computed log of sum of subtree clade credibilities of all
+     * subtrees rooted at this clade
+     */
+    public double computeLogSumCladeCredibilities() {
+        if (this.sumLogCladeCredibilities > 0) {
+            if (this.isLeaf()) {
+                this.sumLogCladeCredibilities = 0;
+            } else if (this.isCherry()) {
+                this.sumLogCladeCredibilities = Math.log(this.getCladeCredibility());
+            } else {
+                double sum = 0;
+                for (CladePartition partition : partitions) {
+                    // TODO
+                    // sum += partition.getChildClades()[0].computeSumCladeCredibilities()
+                    //         * partition.getChildClades()[1].computeSumCladeCredibilities();
+                }
+                this.sumLogCladeCredibilities = sum * this.getCladeCredibility();
+            }
+        }
+
+        return sumLogCladeCredibilities;
+    }
+
+    /**
      * @param value sum of subtree clade credibilities of all subtrees rooted at
      *              this clade
      */
     public void setLogSumCladeCredibilities(double value) {
         if (value > 0) {
-            throw new AssertionError("Log probabilities must be non-positive.");
+            throw new AssertionError("Log probabilities must be non-positive but given value is " + value + ".");
         }
         this.sumLogCladeCredibilities = value;
     }
@@ -963,4 +987,5 @@ public class Clade {
         }
         data.put(key, value);
     }
+
 }

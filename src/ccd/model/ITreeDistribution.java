@@ -1,6 +1,8 @@
 package ccd.model;
 
 import beast.base.evolution.tree.Tree;
+import ccd.algorithms.credibleSets.CredibleSetType;
+import ccd.model.bitsets.BitSet;
 
 import java.math.BigInteger;
 import java.util.Collection;
@@ -22,6 +24,13 @@ public interface ITreeDistribution {
      * @return a tree sampled from this distribution
      */
     public Tree sampleTree(HeightSettingStrategy heightStrategy);
+
+    /**
+     * Return the probability of a randomly sampled tree from this distribution.
+     *
+     * @return probability of randomly sampled tree
+     */
+    public double sampleTreeProbability();
 
     /**
      * Returns the tree (without heights set) with maximum probability in this
@@ -78,4 +87,15 @@ public interface ITreeDistribution {
 
     /** @return all clades of this distribution */
     public Collection<Clade> getClades();
+
+    /**
+     * Return the min credible level of the given tree, that is,
+     * the smallest credible set that still contains this tree.
+     *
+     * @param tree whose cred level is requested
+     * @param type what type of information to use
+     * @return min credible level of given tree
+     */
+    public double getCredibleLevel(Tree tree, CredibleSetType type);
+
 }

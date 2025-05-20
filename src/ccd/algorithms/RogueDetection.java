@@ -4,10 +4,10 @@ import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import ccd.model.AbstractCCD;
 import ccd.model.AttachingFilteredCCD;
-import ccd.model.BitSet;
 import ccd.model.Clade;
 import ccd.model.CladePartition;
 import ccd.model.FilteredCCD;
+import ccd.model.bitsets.BitSet;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -611,7 +611,7 @@ public class RogueDetection {
         // in particular, note that only one edge between grandParent~parent->targetClade can be in the tree.
         // however, multiple grandparents can still be in the tree (forming a chain).
         // for each edge not contained in tree, we lose placement probability
-        BitSet filteredBits = ccd.model.BitSet.newBitSet(baseCCD.getSizeOfLeavesArray()); // reused BitSet
+        BitSet filteredBits = BitSet.newBitSet(baseCCD.getSizeOfLeavesArray()); // reused BitSet
         double lostProbability = 0;
         double sumProbability = 0;
         for (Clade parent : parents) {

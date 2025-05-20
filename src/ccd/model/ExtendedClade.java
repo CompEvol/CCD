@@ -1,5 +1,7 @@
 package ccd.model;
 
+import ccd.model.bitsets.BitSet;
+
 /**
  * This class represents an extended clade used for CCD2s
  * where 'extended' is in the sense that also the clades sibling is stored.

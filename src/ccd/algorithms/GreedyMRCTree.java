@@ -3,9 +3,9 @@ package ccd.algorithms;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import ccd.model.AbstractCCD;
-import ccd.model.BitSet;
 import ccd.model.Clade;
 import ccd.model.HeightSettingStrategy;
+import ccd.model.bitsets.BitSet;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,6 @@
 package ccd.algorithms;
 
-import ccd.model.BitSet;
+import ccd.model.bitsets.BitSet;
 
 /**
  * This class provides methods to work with BitSets.

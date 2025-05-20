@@ -1,10 +1,10 @@
 package ccd.algorithms;
 
 import ccd.model.AbstractCCD;
-import ccd.model.BitSet;
 import ccd.model.CCD0;
 import ccd.model.Clade;
 import ccd.model.CladePartition;
+import ccd.model.bitsets.BitSet;
 
 import java.util.ArrayList;
 import java.util.Comparator;

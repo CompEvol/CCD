@@ -1,24 +1,26 @@
-package ccd.model;
+package ccd.model.bitsets;
 
 /**
- * Realization of the reimplemented, stripped-down {@link BitSet} for 65 to 128 bits.
+ * Realization of the reimplemented, stripped-down {@link BitSet} for 193 to 256 bits.
  */
-public class BitSet128 extends BitSet {
+public class BitSet256 extends BitSet {
     /* Used to shift left or right for a partial word mask */
     private static final long WORD_MASK = 0xffffffffffffffffL;
 
     /**
      * The internal field corresponding to the serialField "bits".
      */
-    private long word1, word2;
+    private long word1, word2, word3, word4;
 
-    public BitSet128() {
+    public BitSet256() {
         super();
     }
 
-    public BitSet128(BitSet128 other) {
+    public BitSet256(BitSet256 other) {
         word1 = other.word1;
         word2 = other.word2;
+        word3 = other.word3;
+        word4 = other.word4;
     }
 
     /**
@@ -34,9 +36,13 @@ public class BitSet128 extends BitSet {
 
 
         if (bitIndex < 64)
-            word1 |= (1L << bitIndex);
-        else
+            word1 |= (1L << bitIndex); // Restores invariants
+        else if (bitIndex < 128)
             word2 |= (1L << (bitIndex - 64));
+        else if (bitIndex < 192)
+            word3 |= (1L << (bitIndex - 128));
+        else
+            word4 |= (1L << (bitIndex - 192));
     }
 
     /**
@@ -53,16 +59,54 @@ public class BitSet128 extends BitSet {
     public void set(int fromIndex, int toIndex) {
         if (fromIndex < 64) {
             word1 = WORD_MASK << fromIndex;
-            if (toIndex >= 64) {
+            if (toIndex >= 192) {
+                word2 = WORD_MASK;
+                word3 = WORD_MASK;
+                word4 = WORD_MASK >>> (-toIndex + 192);
+            } else if (toIndex >= 128) {
+                word2 = WORD_MASK;
+                word3 = WORD_MASK >>> (-toIndex + 128);
+                word4 = 0;
+            } else if (toIndex >= 64) {
                 word2 = WORD_MASK >>> (-toIndex + 64);
+                word3 = 0;
+                word4 = 0;
             } else {
                 word1 &= (WORD_MASK >>> -toIndex);
                 word2 = 0;
+                word3 = 0;
+                word4 = 0;
+            }
+        } else if (fromIndex < 128) {
+            word1 = 0;
+            word2 = WORD_MASK << (fromIndex - 64);
+            if (toIndex >= 192) {
+                word3 = WORD_MASK;
+                word4 = WORD_MASK >>> (-toIndex + 192);
+            } else if (toIndex >= 128) {
+                word3 = WORD_MASK >>> (-toIndex + 128);
+                word4 = 0;
+            } else {
+                word2 &= (WORD_MASK >>> (-toIndex + 64));
+                word3 = 0;
+                word4 = 0;
+            }
+        } else if (fromIndex < 192) {
+            word1 = 0;
+            word2 = 0;
+            word3 = WORD_MASK << (fromIndex - 128);
+            if (toIndex >= 192) {
+                word4 = WORD_MASK >>> (-toIndex + 192);
+            } else {
+                word3 &= (WORD_MASK >>> (-toIndex + 128));
+                word4 = 0;
             }
         } else {
             word1 = 0;
-            word2 = WORD_MASK >>> (-toIndex + 64);
-            word2 &= (WORD_MASK << (fromIndex - 64));
+            word2 = 0;
+            word3 = 0;
+            word4 = WORD_MASK >>> (-toIndex + 192);
+            word4 &= (WORD_MASK << (fromIndex - 192));
         }
     }
 
@@ -76,13 +120,14 @@ public class BitSet128 extends BitSet {
         if (bitIndex < 0)
             throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
 
-        if (wordIndex(bitIndex) >= 2)
-            return;
-
         if (bitIndex < 64)
             word1 &= ~(1L << bitIndex);
-        else
+        else if (bitIndex < 128)
             word2 &= ~(1L << (bitIndex - 64));
+        else if (bitIndex < 192)
+            word3 &= ~(1L << (bitIndex - 128));
+        else
+            word4 &= ~(1L << (bitIndex - 192));
     }
 
     /**
@@ -98,8 +143,10 @@ public class BitSet128 extends BitSet {
         if (this == set)
             return;
 
-        word1 |= ((BitSet128) set).word1;
-        word2 |= ((BitSet128) set).word2;
+        word1 |= ((BitSet256) set).word1;
+        word2 |= ((BitSet256) set).word2;
+        word3 |= ((BitSet256) set).word3;
+        word4 |= ((BitSet256) set).word4;
     }
 
     /**
@@ -125,18 +172,39 @@ public class BitSet128 extends BitSet {
      * @since 1.4
      */
     public int nextSetBit(int fromIndex) {
+        if (fromIndex >= 192) {
+            long word = word4 & (WORD_MASK << (fromIndex - 192));
+            if (word != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            return -1;
+        }
+        if (fromIndex >= 128) {
+            long word = word3 & (WORD_MASK << (fromIndex - 128));
+            if (word != 0)
+                return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            if (word4 != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word4);
+            return -1;
+        }
         if (fromIndex >= 64) {
             long word = word2 & (WORD_MASK << (fromIndex - 64));
             if (word != 0)
                 return (BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            if (word3 != 0)
+                return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word3);
+            if (word4 != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word4);
             return -1;
         }
         long word = word1 & (WORD_MASK << fromIndex);
         if (word != 0)
             return Long.numberOfTrailingZeros(word);
-        word = word2;
-        if (word != 0)
-            return (BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+        if (word2 != 0)
+            return (BITS_PER_WORD) + Long.numberOfTrailingZeros(word2);
+        if (word3 != 0)
+            return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word3);
+        if (word4 != 0)
+            return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word4);
         return -1;
     }
 
@@ -150,10 +218,31 @@ public class BitSet128 extends BitSet {
      * @since 1.4
      */
     public int nextClearBit(int fromIndex) {
+        if (fromIndex >= 192) {
+            long word = ~word4 & (WORD_MASK << (fromIndex - 192));
+            if (word != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            return -1;
+        }
+        if (fromIndex >= 128) {
+            long word = ~word3 & (WORD_MASK << (fromIndex - 128));
+            if (word != 0)
+                return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            word = ~word4;
+            if (word != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            return -1;
+        }
         if (fromIndex >= 64) {
             long word = ~word2 & (WORD_MASK << (fromIndex - 64));
             if (word != 0)
                 return (BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            word = ~word3;
+            if (word != 0)
+                return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+            word = ~word4;
+            if (word != 0)
+                return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
             return -1;
         }
         long word = ~word1 & (WORD_MASK << fromIndex);
@@ -162,6 +251,12 @@ public class BitSet128 extends BitSet {
         word = ~word2;
         if (word != 0)
             return (BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+        word = ~word3;
+        if (word != 0)
+            return (2 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
+        word = ~word4;
+        if (word != 0)
+            return (3 * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
         return -1;
     }
 
@@ -175,9 +270,11 @@ public class BitSet128 extends BitSet {
      * @see #size()
      */
     public Object clone() {
-        BitSet128 result = (BitSet128) new BitSet128();
+        BitSet256 result = (BitSet256) new BitSet256();
         result.word1 = word1;
         result.word2 = word2;
+        result.word3 = word3;
+        result.word4 = word4;
         return result;
     }
 
@@ -191,8 +288,10 @@ public class BitSet128 extends BitSet {
      * @param set a bit set
      */
     public void and(BitSet set) {
-        word1 &= ((BitSet128) set).word1;
-        word2 &= ((BitSet128) set).word2;
+        word1 &= ((BitSet256) set).word1;
+        word2 &= ((BitSet256) set).word2;
+        word3 &= ((BitSet256) set).word3;
+        word4 &= ((BitSet256) set).word4;
     }
 
     /**
@@ -205,9 +304,10 @@ public class BitSet128 extends BitSet {
      */
     public void andNot(BitSet set) {
         // Perform logical (a & !b) on words in common
-        word1 &= ~((BitSet128) set).word1;
-        word2 &= ~((BitSet128) set).word2;
-
+        word1 &= ~((BitSet256) set).word1;
+        word2 &= ~((BitSet256) set).word2;
+        word3 &= ~((BitSet256) set).word3;
+        word4 &= ~((BitSet256) set).word4;
     }
 
     /**
@@ -225,8 +325,10 @@ public class BitSet128 extends BitSet {
      * @param set a bit set
      */
     public void xor(BitSet set) {
-        word1 ^= ((BitSet128) set).word1;
-        word2 ^= ((BitSet128) set).word2;
+        word1 ^= ((BitSet256) set).word1;
+        word2 ^= ((BitSet256) set).word2;
+        word3 ^= ((BitSet256) set).word3;
+        word4 ^= ((BitSet256) set).word4;
     }
 
     /**
@@ -239,9 +341,13 @@ public class BitSet128 extends BitSet {
      * @since 1.4
      */
     public boolean intersects(BitSet set) {
-        if ((word1 & ((BitSet128) set).word1) != 0)
+        if ((word1 & ((BitSet256) set).word1) != 0)
             return true;
-        if ((word2 & ((BitSet128) set).word2) != 0)
+        if ((word2 & ((BitSet256) set).word2) != 0)
+            return true;
+        if ((word3 & ((BitSet256) set).word3) != 0)
+            return true;
+        if ((word4 & ((BitSet256) set).word4) != 0)
             return true;
         return false;
     }
@@ -254,7 +360,7 @@ public class BitSet128 extends BitSet {
      * @since 1.4
      */
     public boolean isEmpty() {
-        return word1 == 0 && word2 == 0;
+        return word1 == 0 && word2 == 0 && word3 == 0 && word4 == 0;
     }
 
     /**
@@ -264,7 +370,7 @@ public class BitSet128 extends BitSet {
      * @since 1.4
      */
     public int cardinality() {
-        return Long.bitCount(word1) + Long.bitCount(word2);
+        return Long.bitCount(word1) + Long.bitCount(word2) + Long.bitCount(word3) + Long.bitCount(word4);
     }
 
     /**
@@ -275,7 +381,7 @@ public class BitSet128 extends BitSet {
      * @return the number of bits currently in this bit set
      */
     public int size() {
-        return 2 * BITS_PER_WORD;
+        return 4 * BITS_PER_WORD;
     }
 
     /**
@@ -287,15 +393,22 @@ public class BitSet128 extends BitSet {
      * @since 1.2
      */
     public int length() {
-        if (word2 == 0) {
-            if (word1 == 0) {
-                return 0;
+        if (word4 == 0) {
+            if (word3 == 0) {
+                if (word2 == 0) {
+                    if (word1 == 0) {
+                        return 0;
+                    } else {
+                        return BITS_PER_WORD - Long.numberOfLeadingZeros(word1);
+                    }
+                } else {
+                    return BITS_PER_WORD * 2 - Long.numberOfLeadingZeros(word2);
+                }
             } else {
-                return BITS_PER_WORD - Long.numberOfLeadingZeros(word1);
+                return BITS_PER_WORD * 3 - Long.numberOfLeadingZeros(word3);
             }
-        } else {
-            return BITS_PER_WORD * 2 - Long.numberOfLeadingZeros(word2);
         }
+        return BITS_PER_WORD * 4 - Long.numberOfLeadingZeros(word4);
     }
 
     /**
@@ -306,71 +419,53 @@ public class BitSet128 extends BitSet {
     public void clear() {
         word1 = 0;
         word2 = 0;
+        word3 = 0;
+        word4 = 0;
     }
 
     @Override
     public int hashCode() {
         long h = 1234;
-        h ^= word1 + word2 * 2;
+        h ^= word1 + word2 * 2 + word3 * 3 + word4 * 7;
         return (int) ((h >> 32) ^ h);
     }
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof BitSet128 set))
+        if (!(obj instanceof BitSet256 set))
             return false;
         if (this == set)
             return true;
-        return set.word1 == word1 && set.word2 == word2;
-    }
-
-    @Override
-    public String toString() {
-
-        final int MAX_INITIAL_CAPACITY = Integer.MAX_VALUE - 8;
-        int numBits = cardinality();
-        // Avoid overflow in the case of a humongous numBits
-        int initialCapacity = (numBits <= (MAX_INITIAL_CAPACITY - 2) / 6) ?
-                6 * numBits + 2 : MAX_INITIAL_CAPACITY;
-        StringBuilder b = new StringBuilder(initialCapacity);
-        b.append('{');
-
-        int i = nextSetBit(0);
-        if (i != -1) {
-            b.append(i);
-            while (true) {
-                if (++i < 0) break;
-                if ((i = nextSetBit(i)) < 0) break;
-                int endOfRun = nextClearBit(i);
-                do {
-                    b.append(", ").append(i);
-                }
-                while (++i != endOfRun);
-            }
-        }
-
-        b.append('}');
-        return b.toString();
+        return set.word1 == word1 && set.word2 == word2 && set.word3 == word3 && set.word4 == word4;
     }
 
     @Override
     public boolean contains(BitSet other) {
-        BitSet128 otherset = ((BitSet128) other);
+        BitSet256 otherset = ((BitSet256) other);
         return ((word1 & otherset.word1) == otherset.word1)
-                && ((word2 & otherset.word2) == otherset.word2);
+                && ((word2 & otherset.word2) == otherset.word2)
+                && ((word3 & otherset.word3) == otherset.word3)
+                && ((word4 & otherset.word4) == otherset.word4);
     }
 
     @Override
     public boolean disjoint(BitSet other) {
-        BitSet128 otherset = ((BitSet128) other);
+        BitSet256 otherset = ((BitSet256) other);
         return ((word1 & otherset.word1) == 0)
-                && ((word2 & otherset.word2) == 0);
+                && ((word2 & otherset.word2) == 0)
+                && ((word3 & otherset.word3) == 0)
+                && ((word4 & otherset.word4) == 0);
     }
+
 
     @Override
     public int lastSetBit() {
-    	if (word2 != 0)
-    		return 2 * BITS_PER_WORD - Long.numberOfLeadingZeros(word2) - 1;
+        if (word4 != 0)
+            return 3 * BITS_PER_WORD - Long.numberOfLeadingZeros(word4) - 1;
+        if (word3 != 0)
+            return 3 * BITS_PER_WORD - Long.numberOfLeadingZeros(word3) - 1;
+        if (word2 != 0)
+            return 2 * BITS_PER_WORD - Long.numberOfLeadingZeros(word2) - 1;
         return BITS_PER_WORD - Long.numberOfLeadingZeros(word1) - 1;
     }
 }

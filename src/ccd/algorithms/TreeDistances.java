@@ -1,7 +1,7 @@
 package ccd.algorithms;
 
-import ccd.model.BitSet;
 import ccd.model.WrappedBeastTree;
+import ccd.model.bitsets.BitSet;
 
 import java.util.ArrayList;
 import java.util.Arrays;

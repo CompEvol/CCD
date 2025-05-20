@@ -1,5 +1,7 @@
 package ccd.model;
 
+import ccd.model.bitsets.BitSet;
+
 import java.util.HashSet;
 
 /**

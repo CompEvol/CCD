@@ -5,6 +5,9 @@ import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeUtils;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 import ccd.algorithms.TreeDistances;
+import ccd.algorithms.credibleSets.CredibleSetType;
+import ccd.algorithms.credibleSets.ProbabilityBasedCredibleSetComputer;
+import ccd.model.bitsets.BitSet;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -54,15 +57,24 @@ public class SampleDistribution implements ITreeDistribution {
     /**
      * Constructor using one TreeSet that is also used as storage of base trees.
      *
-     * @param treeSet burnin assumed to be set
+     * @param treeSet burnin assumed to be set; all of its trees are used
      */
     public SampleDistribution(TreeSet treeSet) {
+        this(treeSet, treeSet.totalTrees - treeSet.burninCount);
+    }
+
+    /**
+     * Constructor using one TreeSet that is also used as storage of base trees.
+     *
+     * @param treeSet       burnin assumed to be set
+     * @param numTreesToUse the number of trees to use from the treeSet
+     */
+    public SampleDistribution(TreeSet treeSet, int numTreesToUse) {
         this.treeSets = new TreeSet[1];
         this.treeSets[0] = treeSet;
-        this.numBaseTrees = treeSet.totalTrees - treeSet.burninCount;
 
         // get all topologies with counts
-        initializeTrees(treeSet);
+        initializeTrees(treeSet, numTreesToUse);
 
         // get all clades with counts
         initializeClades();
@@ -73,7 +85,7 @@ public class SampleDistribution implements ITreeDistribution {
 
     /**
      * Constructor using multiple TreeSets that are also used as storage of base
-     * trees.
+     * trees using all trees.
      *
      * @param treeSets burnins assumed to be set
      */
@@ -83,8 +95,31 @@ public class SampleDistribution implements ITreeDistribution {
         // get all topologies with counts
         int sum = 0;
         for (TreeSet treeSet : treeSets) {
-            sum += treeSet.totalTrees - treeSet.burninCount;
-            initializeTrees(treeSet);
+            int numTrees = treeSet.totalTrees - treeSet.burninCount;
+            initializeTrees(treeSet, numTrees);
+            sum += numTrees;
+        }
+        this.numBaseTrees = sum;
+
+        initialize();
+    }
+
+    /**
+     * Constructor using multiple TreeSets that are also used as storage of base
+     * trees.
+     *
+     * @param treeSets burnins assumed to be set
+     */
+    public SampleDistribution(TreeSet[] treeSets, int[] numTreesToUse) {
+        this.treeSets = treeSets;
+
+        // get all topologies with counts
+        int sum = 0;
+        int i = 0;
+        for (TreeSet treeSet : treeSets) {
+            int numTrees = Math.min(treeSet.totalTrees - treeSet.burninCount, numTreesToUse[i++]);
+            initializeTrees(treeSet, numTrees);
+            sum += numTrees;
         }
         this.numBaseTrees = sum;
 
@@ -102,13 +137,16 @@ public class SampleDistribution implements ITreeDistribution {
     }
 
     /* Constructor helper method */
-    private void initializeTrees(TreeSet treeSet) {
+    private void initializeTrees(TreeSet treeSet, int numTreesToUse) {
+        int numUsedTrees = 0;
         try {
             treeSet.reset();
             Tree tree = treeSet.next();
             this.numLeaves = tree.getLeafNodeCount();
 
-            while (tree != null) {
+            while ((tree != null) && (numUsedTrees < numTreesToUse)) {
+                numUsedTrees++;
+                this.numBaseTrees++;
                 processTree(tree);
                 tree = treeSet.next();
             }
@@ -231,6 +269,24 @@ public class SampleDistribution implements ITreeDistribution {
 
         System.err.println("No tree sampled. Suspect number of tree counts does not add up to number of base trees.");
         return null;
+    }
+
+    @Override
+    public double sampleTreeProbability() {
+        this.tidyUpIfDirty();
+
+        int pick = this.getRandom().nextInt(numBaseTrees);
+        int next = 0;
+        for (WrappedBeastTree tree : trees) {
+            next += tree.getCount();
+
+            if (pick <= next) {
+                return tree.getCount() / (double) this.numBaseTrees;
+            }
+        }
+
+        System.err.println("No tree probability sampled. Suspect number of tree counts does not add up to number of base trees.");
+        return -1;
     }
 
     @Override
@@ -387,6 +443,39 @@ public class SampleDistribution implements ITreeDistribution {
 
         return entropy;
     }
+
+
+    /* -- CREDIBLE SET - CREDIBLE SET -- */
+
+    private ProbabilityBasedCredibleSetComputer treeBasedCredibleSetComputer;
+
+    @Override
+    public double getCredibleLevel(Tree tree, CredibleSetType type) {
+        if (type == CredibleSetType.Frequency) {
+            WrappedBeastTree wrappedInputTree = new WrappedBeastTree(tree);
+
+            double sum = 0;
+            for (WrappedBeastTree wrappedStoredTree : trees) {
+                sum += wrappedStoredTree.getCount();
+
+                if (TreeDistances.robinsonsFouldDistance(wrappedStoredTree, wrappedInputTree) == 0) {
+                    return sum / this.numBaseTrees;
+                }
+            }
+
+            return -1;
+        } else if (type == CredibleSetType.TreeSampling) {
+            if (treeBasedCredibleSetComputer == null) {
+                treeBasedCredibleSetComputer = new ProbabilityBasedCredibleSetComputer(this);
+            }
+            return treeBasedCredibleSetComputer.getCredibleLevel(tree);
+        } else {
+            throw new IllegalArgumentException("Credible set type not supported by sample distributions.");
+        }
+    }
+
+
+    /* -- OTHER - OTHER -- */
 
     /**
      * Computes and returns the Fair Proportion Diversity Index of the taxa in this sample distribution.

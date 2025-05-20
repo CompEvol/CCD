@@ -3,6 +3,7 @@ package ccd.model;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
+import ccd.model.bitsets.BitSet;
 
 import java.io.IOException;
 import java.util.ArrayList;

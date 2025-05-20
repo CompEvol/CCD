@@ -8,10 +8,10 @@ import beastfx.app.treeannotator.TreeAnnotator;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
 import beastfx.app.treeannotator.services.TopologySettingService;
 import ccd.model.AbstractCCD;
-import ccd.model.BitSet;
 import ccd.model.CCD2;
 import ccd.model.ExtendedClade;
 import ccd.model.HeightSettingStrategy;
+import ccd.model.bitsets.BitSet;
 
 import java.io.IOException;
 import java.io.PrintStream;

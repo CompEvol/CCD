@@ -1,4 +1,4 @@
-package ccd.model;
+package ccd.model.bitsets;
 
 /**
  * Stripped down version of {@link java.util.BitSet} adapted for speedup;
@@ -508,19 +508,19 @@ public class BitSet implements Cloneable {
      * Returns -1 if no bit is set.
      */
     public int lastSetBit() {
-        int u = words.length-1;
+        int u = words.length - 1;
 
         long word = words[u];
         while (word == 0 && u >= 0) {
-        	u--;
-        	word = words[u];
+            u--;
+            word = words[u];
         }
         if (u < 0) {
-        	// no bit set
-        	return -1;
+            // no bit set
+            return -1;
         }
 
-        return ((u+1) * BITS_PER_WORD) - Long.numberOfLeadingZeros(word) - 1;
+        return ((u + 1) * BITS_PER_WORD) - Long.numberOfLeadingZeros(word) - 1;
     }
-    
+
 }

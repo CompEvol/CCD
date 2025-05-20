@@ -26,7 +26,7 @@ import java.util.List;
  * </p>
  *
  * <p>
- * The MAP tree of this distribution is the tree with highest ccd.
+ * The MAP tree of this distribution is the tree with highest CCP.
  * </p>
  *
  * @author Jonathan Klawitter
@@ -54,7 +54,7 @@ public class CCD1 extends AbstractCCD {
      *
      * @param treeSet an iterable set of trees, which contains no burnin trees,
      *                whose distribution is approximated by the resulting
-     *                {@link CCD1}
+     *                {@link CCD1}; all of its trees are used
      */
     public CCD1(TreeSet treeSet) {
         this(treeSet, false);
@@ -64,9 +64,21 @@ public class CCD1 extends AbstractCCD {
      * Constructor for a {@link CCD1} based on the given collection of trees
      * (not containing any burnin trees).
      *
+     * @param treeSet       an iterable set of trees, which contains no burnin trees,
+     *                      whose distribution is approximated by the resulting {@link CCD1}
+     * @param numTreesToUse the number of trees to use from the treeSet
+     */
+    public CCD1(TreeSet treeSet, int numTreesToUse) {
+        super(treeSet, numTreesToUse, false);
+    }
+
+    /**
+     * Constructor for a {@link CCD1} based on the given collection of trees
+     * (not containing any burnin trees).
+     *
      * @param treeSet        an iterable set of trees, which contains no burnin trees,
      *                       whose distribution is approximated by the resulting
-     *                       {@link CCD1}
+     *                       {@link CCD1}; all of its trees are used
      * @param storeBaseTrees whether to store the trees used to create this CCD
      */
     public CCD1(TreeSet treeSet, boolean storeBaseTrees) {

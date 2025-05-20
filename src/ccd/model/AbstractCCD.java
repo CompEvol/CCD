@@ -3,6 +3,11 @@ package ccd.model;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
+import ccd.algorithms.credibleSets.CredibleCCDComputer;
+import ccd.algorithms.credibleSets.CredibleSetType;
+import ccd.algorithms.credibleSets.ICredibleSet;
+import ccd.algorithms.credibleSets.ProbabilityBasedCredibleSetComputer;
+import ccd.model.bitsets.BitSet;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -41,8 +46,17 @@ import java.util.Set;
  */
 public abstract class AbstractCCD implements ITreeDistribution {
 
+    /** Key for probability metadata stored in vertices of tree obtained from CCD. */
+    public static final String PROB_SUBTREE_KEY = "pSubtree";
+
+    /** Key for log-probability metadata stored in vertices of tree obtained from CCD. */
+    public static final String LOG_PROB_SUBTREE_KEY = "logPSubtree";
+
     /** Key for posterior support (clade probability) of vertex based on CCD. */
     public static final String CLADE_SUPPORT_KEY = "posterior";
+
+    /** Whether to use log probabilities instead of probabilities; necessary for huge/diffuse CCDs. */
+    protected boolean useLogProbabilities = false;
 
     /** Whether to print information during construction, etc. */
     public static boolean verbose = true;
@@ -139,10 +153,24 @@ public abstract class AbstractCCD implements ITreeDistribution {
      *
      * @param treeSet        an iterable set of trees, which contains no burnin trees and
      *                       that are used to build and populate the CCD graph of this
-     *                       {@link AbstractCCD}
+     *                       {@link AbstractCCD}; all of its trees are used
      * @param storeBaseTrees whether to store the trees used to create this CCD
      */
     public AbstractCCD(TreeSet treeSet, boolean storeBaseTrees) {
+        this(treeSet, treeSet.totalTrees - treeSet.burninCount, storeBaseTrees);
+    }
+
+    /**
+     * Constructor for a {@link AbstractCCD} based on the given collection of
+     * trees (not containing any burnin trees), of which the given number of trees are used.
+     *
+     * @param treeSet        an iterable set of trees, which contains no burnin trees and
+     *                       that are used to build and populate the CCD graph of this
+     *                       {@link AbstractCCD}
+     * @param numTreesToUse  the number of trees to use from the treeSet
+     * @param storeBaseTrees whether to store the trees used to create this CCD
+     */
+    public AbstractCCD(TreeSet treeSet, int numTreesToUse, boolean storeBaseTrees) {
         this(storeBaseTrees);
         this.baseTreeSet = treeSet;
         this.burnin = 0;
@@ -155,7 +183,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
                 out.println("Constructing CCD with " + (treeSet.totalTrees - treeSet.burninCount) + " trees...");
             }
 
-            while (tree != null) {
+            while ((tree != null) && (numBaseTrees < numTreesToUse)) {
                 this.numBaseTrees++;
                 cladifyTree(tree);
 
@@ -531,7 +559,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
      */
     public int getNumberOfCladePartitions() {
         int count = 0;
-        for (Clade clade : cladeMapping.values()) {
+        for (Clade clade : this.getClades()) {
             count += clade.getNumberOfPartitions();
         }
         return count;
@@ -633,7 +661,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         this.entropyDirty = true;
         this.numberOfTopologiesDirty = true;
         this.commonAncestorHeightsDirty = true;
-        this.cladeMinCredibility = null;
+        this.credibleSets.clear();
     }
 
     /**
@@ -931,6 +959,15 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return vertex;
     }
 
+    @Override
+    public double sampleTreeProbability() {
+        return (double) sampleTree().getRoot().getMetaData(PROB_SUBTREE_KEY);
+    }
+
+    public double sampleTreeLogProbability() {
+        return (double) sampleTree().getRoot().getMetaData(LOG_PROB_SUBTREE_KEY);
+    }
+
     /**
      * Returns the probability of the most likely tree. Note that this can
      * underflow for large trees. It is recommended to use {@link #getMaxLogTreeProbability()}
@@ -1200,19 +1237,41 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
 
     /* -- PROBABILITY - PROBABILITY -- */
+    protected void setToUseLogProbabilities() {
+        this.useLogProbabilities = true;
+    }
+
+    protected boolean useLogProbabilities() {
+        return useLogProbabilities;
+    }
 
     @Override
     public double getProbabilityOfTree(Tree tree) {
         resetCacheIfProbabilitiesDirty();
 
         double[] runningProbability = new double[]{1};
-        computeProbabilityOfVertex(tree.getRoot(), runningProbability);
+        computeProbabilityOfVertex(tree.getRoot(), runningProbability, false);
+
+        return runningProbability[0];
+    }
+
+    /**
+     * Return the log probability of the given tree in this distribution.
+     *
+     * @param tree whose log probability is requested
+     * @return the log probability of the given tree
+     */
+    public double getLogProbabilityOfTree(Tree tree) {
+        resetCacheIfProbabilitiesDirty();
+
+        double[] runningProbability = new double[]{0};
+        computeProbabilityOfVertex(tree.getRoot(), runningProbability, true);
 
         return runningProbability[0];
     }
 
     /* Recursive helper method */
-    private Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability) {
+    private Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability, boolean computeLog) {
         BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
 
         if (vertex.isLeaf()) {
@@ -1223,13 +1282,15 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
             return cladeMapping.get(cladeInBits);
         } else {
-            Clade firstChildClade = computeProbabilityOfVertex(vertex.getChildren().get(0),
-                    runningProbability);
-            Clade secondChildClade = computeProbabilityOfVertex(vertex.getChildren().get(1),
-                    runningProbability);
+            Clade firstChildClade = computeProbabilityOfVertex(vertex.getChildren().get(0), runningProbability, computeLog);
+            Clade secondChildClade = computeProbabilityOfVertex(vertex.getChildren().get(1), runningProbability, computeLog);
+
+            if (computeLog && runningProbability[0] > 0) {
+                return null;
+            }
 
             if ((firstChildClade == null) || (secondChildClade == null)) {
-                runningProbability[0] = 0;
+                setComputedNoProbability(runningProbability, computeLog);
                 return null;
             }
 
@@ -1238,19 +1299,30 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
             Clade currentClade = cladeMapping.get(cladeInBits);
             if (currentClade != null) {
-
-                CladePartition partition = currentClade.getCladePartition(firstChildClade,
-                        secondChildClade);
+                CladePartition partition = currentClade.getCladePartition(firstChildClade, secondChildClade);
                 if (partition != null) {
-                    runningProbability[0] *= partition.getCCP();
+                    if (computeLog) {
+                        runningProbability[0] += partition.getLogCCP();
+
+                    } else {
+                        runningProbability[0] *= partition.getCCP();
+                    }
                 } else {
-                    runningProbability[0] = 0;
+                    setComputedNoProbability(runningProbability, computeLog);
                 }
             } else {
-                runningProbability[0] = 0;
+                setComputedNoProbability(runningProbability, computeLog);
             }
 
             return currentClade;
+        }
+    }
+
+    private static void setComputedNoProbability(double[] runningProbability, boolean computeLog) {
+        if (computeLog) {
+            runningProbability[0] = 1;
+        } else {
+            runningProbability[0] = 0;
         }
     }
 
@@ -1287,9 +1359,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         resetCacheIfProbabilitiesDirty();
 
         for (Clade clade : this.getClades()) {
-            if (!clade.isLeaf()) {
-                clade.setProbability(-1);
-            }
+            clade.setProbability(-1);
         }
 
         // the probability of a clade in a CCD is given by the sum of products
@@ -1310,18 +1380,12 @@ public abstract class AbstractCCD implements ITreeDistribution {
             if (count != clade.getNumberOfParentClades()) {
                 // clade was not visited often enough or was already handled
                 continue;
-            } else if (clade.isLeaf()) {
-                continue;
             }
 
             double parentProbability = clade.getProbability();
 
             for (CladePartition partition : clade.getPartitions()) {
                 for (Clade childClade : partition.getChildClades()) {
-                    if (childClade.isLeaf()) {
-                        continue;
-                    }
-
                     // if reset, value is -1, so have to start with 0
                     double childProbability = Math.max(0, childClade.getProbability());
                     // probability of child clade is sum
@@ -1334,12 +1398,16 @@ public abstract class AbstractCCD implements ITreeDistribution {
                         System.err.println("child clade = " + childClade);
                         System.err.println("    w old probability:   " + childClade.getProbability());
                         System.err.println("    and new probability: " + childProbability);
+                        System.err.println("    and following parents: ");
+                        for (Clade nextParent : childClade.getParentClades()) {
+                            System.err.println("\t" + nextParent);
+                        }
                         System.err.println("Partition = " + partition);
                         System.err.println("    with CCP: " + partition.getCCP());
-                        System.err.println("List all partitions of parent clade: ");
-                        for (CladePartition partition1 : clade.getPartitions()) {
-                            System.err.println("\t" + partition1);
-                        }
+                        // System.err.println("List all partitions of parent clade: ");
+                        // for (CladePartition partition1 : clade.getPartitions()) {
+                        //     System.err.println("\t" + partition1);
+                        // }
                         throw new AssertionError("Computation of invalid probability.");
                     }
 
@@ -1395,160 +1463,58 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /* -- CREDIBLE SET - CREDIBLE SET -- */
 
-    /** Whether credible level is computed based on clade or clade partition credible levels. */
-    public static enum CredibleLevelType {
-        Clade, CladePartition;
+    /** Different credible sets used for this CCD. */
+    private Map<CredibleSetType, ICredibleSet> credibleSets = new HashMap<>(3);
+
+    @Override
+    public double getCredibleLevel(Tree tree, CredibleSetType type) {
+        ICredibleSet credibleSet = credibleSets.get(type);
+        if (credibleSet == null) {
+            credibleSet = initializeCredibleSet(type);
+        }
+        return credibleSet.getCredibleLevel(tree);
     }
 
     /**
-     * Credible level information based on clades.
-     * Stored value for a clade represents its credible level,
-     * i.e., the smallest threshold for which the clade is in the credible set
-     * and for the next smaller one it is not.
+     * Initialize and return a credible set of this CCD based on sampling trees ({@link CredibleSetType#TreeSampling}).
+     * Is also stored in this CCD for further use. A credible set will overwrite a previous one of the same type.
+     *
+     * @param numberOfSamples specifying how many sampled trees to use construct credible set
+     * @return the tree based credible set
      */
-    private Map<Clade, Double> cladeMinCredibility;
+    public ProbabilityBasedCredibleSetComputer initializeTreeBasedCredibleSet(int numberOfSamples) {
+        ProbabilityBasedCredibleSetComputer credibleSet = new ProbabilityBasedCredibleSetComputer(this, numberOfSamples);
+        credibleSets.put(CredibleSetType.TreeSampling, credibleSet);
+        return credibleSet;
+    }
 
     /**
-     * Credible level information based on clade partitions.
-     * Stored value for a partition represents its credible level,
-     * i.e., the smallest threshold for which the partition is in the credible set
-     * and for the next smaller one it is not.
+     * Initialize and return a credible set of this CCD based on the given type/strategy.
+     * Is also stored in this CCD for further use. A credible set will overwrite a previous one of the same type.
+     *
+     * @param type which type of credible set is wanted
+     * @return the credible set
      */
-    private Map<CladePartition, Double> partitionMinCredibility;
+    public ICredibleSet initializeCredibleSet(CredibleSetType type) {
+        ICredibleSet credibleSet;
+        if (type == CredibleSetType.TreeSampling) {
+            credibleSet = new ProbabilityBasedCredibleSetComputer(this);
+        } else if (type == CredibleSetType.Frequency) {
+            throw new IllegalArgumentException("Frequency based credible set not supported for CCDs");
+        } else {
+            credibleSet = CredibleCCDComputer.getCredibleCCDComputer(this, type);
+        }
+        credibleSets.put(type, credibleSet);
 
-    public Map<Clade, Double> getCladeMinCredibility() {
-        return cladeMinCredibility;
-    }
-
-    public void setCladeMinCredibility(Map<Clade, Double> cladeMinCredibility) {
-        this.cladeMinCredibility = cladeMinCredibility;
-    }
-
-    public Map<CladePartition, Double> getPartitionMinCredibility() {
-        return partitionMinCredibility;
+        return credibleSet;
     }
 
     /**
      * @param type of credible set information
      * @return whether the credible set information has been computed and set
      */
-    public boolean isCredibleSetInformationInitialized(CredibleLevelType type) {
-        return switch (CredibleLevelType.Clade) {
-            case Clade -> cladeMinCredibility != null;
-            case CladePartition -> partitionMinCredibility != null;
-            default -> false;
-        };
-    }
-
-    public void setPartitionMinCredibility(Map<CladePartition, Double> partitionMinCredibility) {
-        this.partitionMinCredibility = partitionMinCredibility;
-    }
-
-    /**
-     * Return the min credible level of the given tree, that is,
-     * the smallest credible set that still contains this tree.
-     *
-     * @param tree whose cred level is requested
-     * @param type what type of information to use
-     * @return min credible level of given tree
-     */
-    public double getCredibleLevelOfTree(Tree tree, CredibleLevelType type) {
-        return switch (type) {
-            case Clade -> getCredibleLevelOfTreeBasedOnClades(tree);
-            case CladePartition -> getCredibleLevelOfTreeBasedOnPartitions(tree);
-            default -> 0;
-        };
-    }
-
-    /* Helper method */
-    private double getCredibleLevelOfTreeBasedOnClades(Tree tree) {
-        WrappedBeastTree wrapped = new WrappedBeastTree(tree);
-        double maxCredLevel = 0;
-        for (BitSet bits : wrapped.getClades()) {
-            double credLevel = getCredibleLevelOfClade(bits);
-            if (credLevel == 0) {
-                return credLevel;
-            }
-            if (credLevel > maxCredLevel) {
-                maxCredLevel = credLevel;
-            }
-        }
-
-        return maxCredLevel;
-    }
-
-    /* Helper method */
-    private double getCredibleLevelOfClade(BitSet cladeInBits) {
-        Clade clade = this.getClade(cladeInBits);
-        return (clade == null) ? 0 : cladeMinCredibility.get(clade);
-    }
-
-    /* Helper method */
-    private double getCredibleLevelOfTreeBasedOnPartitions(Tree tree) {
-        double[] credLevel = new double[]{Double.NEGATIVE_INFINITY};
-        getCredibleLevelOfPartition(tree.getRoot(), credLevel);
-        if (credLevel[0] <= 0) {
-            return 0;
-        }
-        return credLevel[0];
-    }
-
-    /* Recursive helper method */
-    private BitSet getCredibleLevelOfPartition(Node node, double[] credLevel) {
-        BitSet bits;
-        if (node.isLeaf()) {
-            bits = BitSet.newBitSet(this.getNumberOfLeaves());
-            bits.set(node.getNr());
-        } else {
-            bits = getCredibleLevelOfPartition(node.getLeft(), credLevel);
-            if (credLevel[0] == 0) {
-                return bits;
-            }
-            BitSet other = getCredibleLevelOfPartition(node.getRight(), credLevel);
-            if (credLevel[0] == 0) {
-                return bits;
-            }
-
-            Clade leftChild = this.getClade(bits);
-            Clade rightChild = this.getClade(other);
-
-            bits.or(other);
-            Clade parent = this.getClade(bits);
-            if (parent == null) {
-                credLevel[0] = 0;
-                out.println("clade not found, bits = " + bits);
-                out.println("clades in ccd:");
-                for (Clade clade : this.getClades()) {
-                    out.println("clade = " + clade);
-                }
-                return bits;
-            }
-
-            CladePartition partition = parent.getCladePartition(leftChild, rightChild);
-            if (partition == null) {
-                credLevel[0] = 0;
-            } else {
-                credLevel[0] = Math.max(credLevel[0], this.getPartitionMinCredibility().get(partition));
-            }
-        }
-
-        return bits;
-    }
-
-    /**
-     * Converts and rounds the given credible level to an integer percentage between 0 and 100.
-     * So a value x in [1, 100] represents being (already) in the x%-credible level
-     * while a value 0, represents not being in the distribution at all.
-     *
-     * @param credibleLevel assumed in [0,1]
-     * @return credible level converted to int as percentage
-     */
-    public int convertCredibleLevel(double credibleLevel) {
-        if (credibleLevel <= 0) {
-            return 0;
-        } else {
-            return (int) Math.ceil(credibleLevel * 100);
-        }
+    public boolean isCredibleSetInformationInitialized(CredibleSetType type) {
+        return credibleSets.get(type) != null;
     }
 
 
@@ -1606,17 +1572,14 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
         double lostProbability = 0.0;
         handledClades.add(clade);
-//        out.println("o");
 
         for (CladePartition partition : clade.getPartitions()) {
             Clade firstChild = partition.getChildClades()[0];
             Clade secondChild = partition.getChildClades()[1];
 
             if (excludedClades.contains(firstChild) || excludedClades.contains(secondChild)) {
-//                out.print("x");
                 lostProbability += partition.getCCP();
             } else {
-//                out.print("z");
                 lostProbability += lostProbability(firstChild, excludedClades, handledClades)
                         + lostProbability(secondChild, excludedClades, handledClades);
             }

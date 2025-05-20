@@ -3,6 +3,7 @@ package ccd.model;
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import ccd.algorithms.TreeDistances;
+import ccd.model.bitsets.BitSet;
 
 import java.util.ArrayList;
 

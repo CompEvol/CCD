@@ -15,10 +15,10 @@ import beastfx.app.util.OutFile;
 import beastfx.app.util.TreeFile;
 import ccd.algorithms.RogueDetection;
 import ccd.model.AbstractCCD;
-import ccd.model.BitSet;
 import ccd.model.CCDType;
 import ccd.model.FilteredCCD;
 import ccd.model.HeightSettingStrategy;
+import ccd.model.bitsets.BitSet;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -59,9 +59,9 @@ public class SkeletonAnalysis extends Runnable {
             "heights used in MAP tree output, can be CA (Mean of Least Common Ancestor heights), MH (mean (sampled) height), or ONE",
             hss.CA,
             hss.values());
-    
+
     final public Input<OutFile> rogueTaxaFileInput = new Input<>("rogueTaxaFile", "file name to output text file containing taxa of rogue removal sequence");
-    
+
     final public Input<OutFile> excludeInput = new Input<>("exclude", "file name of text file containing taxa to exclude from filtering" +
             " -- can be comma, tab or newline delimited.");
 
@@ -113,26 +113,26 @@ public class SkeletonAnalysis extends Runnable {
                     + ccdi.getEntropy() + " - " //
                     + ccdi.getNumberOfClades() + " - "//
                     + ((ccdi instanceof FilteredCCD) ? ccd.getTaxaNames(((FilteredCCD) ccdi).getRemovedTaxaMask()) : ""));
-        	if (ccdi instanceof FilteredCCD) {
-        		String str = ccd.getTaxaNames(((FilteredCCD) ccdi).getRemovedTaxaMask());
-        		str = str.replaceAll("\\{", "");
-        		str= str.replaceAll("\\}", "");
-        		String [] strs = str.split(",");
-        		for (String s : strs) {
-        			rogueTaxa.add(s);
-        		}
+            if (ccdi instanceof FilteredCCD) {
+                String str = ccd.getTaxaNames(((FilteredCCD) ccdi).getRemovedTaxaMask());
+                str = str.replaceAll("\\{", "");
+                str = str.replaceAll("\\}", "");
+                String[] strs = str.split(",");
+                for (String s : strs) {
+                    rogueTaxa.add(s);
+                }
             }
         }
 
         PrintStream roguesOutput = null;
         if (rogueTaxaFileInput.get() != null && !rogueTaxaFileInput.get().getName().equals("[[none]]")) {
-        	roguesOutput = new PrintStream(rogueTaxaFileInput.get());
-    		for (String taxon : rogueTaxa) {
-    			roguesOutput.println(taxon);
-    		}
-        	roguesOutput.close();
+            roguesOutput = new PrintStream(rogueTaxaFileInput.get());
+            for (String taxon : rogueTaxa) {
+                roguesOutput.println(taxon);
+            }
+            roguesOutput.close();
         }
-        
+
         // filter tree set if outputInput is specified
         filterTrees(treeSet, ccds, rogueTaxa);
 
