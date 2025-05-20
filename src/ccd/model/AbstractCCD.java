@@ -886,6 +886,8 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
             vertex = new Node(taxonName);
             vertex.setNr(leafNr);
+            vertex.setMetaData(PROB_SUBTREE_KEY, 1.0);
+            vertex.setMetaData(LOG_PROB_SUBTREE_KEY, 0.0);
             vertex.setMetaData(CLADE_SUPPORT_KEY, 1.0);
             // vertex.setNr(runningLeafIndex++);
             if (heightStrategy != null) {
@@ -916,6 +918,16 @@ public abstract class AbstractCCD implements ITreeDistribution {
             }
             vertex.addChild(firstChild);
             vertex.addChild(secondChild);
+
+            // attach probability information
+            Double p = (Double) firstChild.getMetaData(PROB_SUBTREE_KEY)
+                    * (Double) secondChild.getMetaData(PROB_SUBTREE_KEY)
+                    * partition.getCCP();
+            Double logP = (Double) firstChild.getMetaData(LOG_PROB_SUBTREE_KEY)
+                    + (Double) secondChild.getMetaData(LOG_PROB_SUBTREE_KEY)
+                    + partition.getLogCCP();
+            vertex.setMetaData(PROB_SUBTREE_KEY, p);
+            vertex.setMetaData(LOG_PROB_SUBTREE_KEY, logP);
 
             if (heightStrategy == HeightSettingStrategy.MeanOccurredHeights) {
                 vertex.setHeight(clade.getMeanOccurredHeight());

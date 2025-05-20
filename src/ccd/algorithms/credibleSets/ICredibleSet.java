@@ -3,7 +3,7 @@ package ccd.algorithms.credibleSets;
 import beast.base.evolution.tree.Tree;
 
 /**
- * A credible set of an {@link ccp.model.ITreeDistribution} supporting (at least) the most important methods.
+ * A credible set of an {@link ccd.model.ITreeDistribution} supporting (at least) the most important methods.
  *
  * @author Jonathan Klawitter
  */
@@ -21,7 +21,7 @@ public interface ICredibleSet {
     }
 
     /**
-     * Compute and return the credible level of the given tree in the underlying {@link ccp.model.ITreeDistribution}.
+     * Compute and return the credible level of the given tree in the underlying {@link ccd.model.ITreeDistribution}.
      *
      * @param tree whose credible level is requested
      * @return credible level of the given tree in (0,1] or -1 if tree is not in distribution
@@ -29,7 +29,7 @@ public interface ICredibleSet {
     double getCredibleLevel(Tree tree);
 
     /**
-     * Sample a tree from the alpha credible set of the underlying  {@link ccp.model.ITreeDistribution}.
+     * Sample a tree from the alpha credible set of the underlying  {@link ccd.model.ITreeDistribution}.
      *
      * @param alpha credible level in (0,1]
      * @return a tree sampled from the alpha

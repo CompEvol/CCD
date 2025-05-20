@@ -60,6 +60,7 @@ public class TreeCredibleLevel extends beast.base.inference.Runnable {
         // init CCD
         MemoryFriendlyTreeSet treeSetCCD = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
         AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSetCCD, ccdTypeInput);
+        ccd.computeCladeProbabilities();
 
         // init test tree
         MemoryFriendlyTreeSet treeSetTest = CCDToolUtil.getTreeSet(testTreeInput, 0);
@@ -80,7 +81,9 @@ public class TreeCredibleLevel extends beast.base.inference.Runnable {
 
         // calculations
         double p = ccd.getProbabilityOfTree(testTree);
-        int credLevel = (int) Math.ceil(cred.getCredibleLevel(testTree));
+        double credLevel = cred.getCredibleLevel(testTree);
+        // int credLevel = (int) Math.ceil(100 * cred.getCredibleLevel(testTree));
+        System.out.printf("Credible level of given tree: %f\n", credLevel);
 
         // output
         if (!quiet) {

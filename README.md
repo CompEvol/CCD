@@ -93,7 +93,7 @@ It has three parameters:
 - `ccdType`: either `CCD0`, `CCD1`, or `CCD2` (default: `CCD0`)
 
 
-### Rogue Analysis
+#### Rogue Analysis
 
 A rogue analysis computes a **rogue score** for each clade, including each taxon, based on a given posterior sample of *binary* trees and some parameters and prints it to a csv file.
 Furthermore, it annotates each clade in a CCD MAP tree with the respective rogue score.
@@ -111,7 +111,7 @@ The app has the following parameters:
 - `out`: file name for output (without file ending), will be used with '.csv' for rogue score and '.trees' for annotated MAP trees
 - `separator`: separator used in csv file (default: `tab`)
 
-### Skeleton Analysis
+#### Skeleton Analysis
 
 A skeleton analysis iteratively removes the clade with the highest rogue score until a threshold is reached.
 ```
@@ -119,7 +119,7 @@ A skeleton analysis iteratively removes the clade with the highest rogue score u
 ```
 The app has the following parameters:
 - `trees`: trees file to construct CCD with and analyse (required)
-- `burnin`: percentage of trees to be used as burn-in (default: `10%`)
+- `burnin`: percentage of trees to be used as burn-in (integer, default: `10%`)
 - `ccdType`: either `CCD0` or `CCD1` (default: `CCD0`)
 
 Two important parameters are the termination strategy and its threshold.
@@ -138,5 +138,22 @@ and `NumTopologies` (clade whose removal reduces the number of trees in the CCD 
 If you further specify an output file, then the given tree set will be reduced/filtered to the remaining taxa
 - `out`: reduced tree output file; th given tree set will not be filtered if not specified
 - `exclude`: file name of text file containing taxa to exclude from filtering - can be comma, tab or newline delimited
+
+### Credible Level Evaluation
+
+The credible level of a tree within a credible CCD or a probability-based credible set (on a CCD) can be computed with the following tool.
+```
+/path/to/applauncher TreeCredibleLevel -trees /path/to/treeInputFile.trees -tree /path/to/treeInputFile.tree(s) -burnin 10 -out path/to/outputTreeFile
+```
+The app has the following parameters:
+- `trees`: trees file to construct CCD with and analyse (required)
+- `burnin`: percentage of trees to be used as burn-in (integer, default: `10%`)
+- `ccdType`: either `CCD0` or `CCD1` or `CCD2` (default: `CCD1`)
+- `tree`: tree for which the credible level is computed
+- `method`: whether to use probability-based method (`probability`, default) or a credible CCD (`credibleCCD`)
+For the probability-based method the following two parameters can be set:
+- `numsamples`: the number of trees sampled from the CCD to compute the credible level thresholds (default: `10000`)
+
+
 
 
