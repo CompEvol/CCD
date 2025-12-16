@@ -367,7 +367,7 @@ public class CCDCombiner {
      * @return the prior probability of the given partition under birth-death or
      * coalescent models with contemporaneous leaves
      */
-    private static double getPartitionPriorProbability(CladePartition partition, double[][] priorProbabilityTable) {
+    public static double getPartitionPriorProbability(CladePartition partition, double[][] priorProbabilityTable) {
         int nParent = partition.getParentClade().size();
         int nChild = partition.getChildClades()[0].size();
         if (nChild > (nParent / 2)) {
