@@ -1,0 +1,50 @@
+package ccd.algorithms.regularisation;
+
+import beast.base.evolution.tree.Tree;
+import ccd.model.RegCCD;
+import org.apache.commons.math3.analysis.UnivariateFunction;
+import org.apache.commons.math3.optim.MaxEval;
+import org.apache.commons.math3.optim.nonlinear.scalar.GoalType;
+import org.apache.commons.math3.optim.univariate.BrentOptimizer;
+import org.apache.commons.math3.optim.univariate.SearchInterval;
+import org.apache.commons.math3.optim.univariate.UnivariateObjectiveFunction;
+import org.apache.commons.math3.optim.univariate.UnivariatePointValuePair;
+import java.util.List;
+
+public class RegCCDParameterOptimiser {
+    public static UnivariateFunction defineFunction(RegCCD regCCD, List<Tree> treeList) {
+        UnivariateFunction f = alpha -> {
+            double totalLogProb = 0.0;
+            int nonNegInfLogProbTreeCount = 0;
+            for (int j = 0; j < treeList.size(); j++) { // loop through input tree set
+                Tree testTree = treeList.get(j);
+                double prob = regCCD.getProbOfHeldOutTree(testTree, alpha);
+                double logProb = regCCD.getLogProbOfHeldOutTree(testTree, alpha);
+                if (logProb != Double.NEGATIVE_INFINITY) {
+                    totalLogProb += logProb;
+                    nonNegInfLogProbTreeCount++;
+                }
+                if ((logProb != Double.NEGATIVE_INFINITY && prob == 0) ||
+                        (logProb == Double.NEGATIVE_INFINITY && prob != 0)) {
+                    throw new IllegalStateException(String.format("Inconsistent probability detected: prob = %g, logProb = %g", prob, logProb));
+                }
+            }
+            double avgLogProb = totalLogProb / nonNegInfLogProbTreeCount;
+            System.out.println(String.format("testing alpha = %.4f, avgLogProb = %.4f", alpha, avgLogProb));
+            return avgLogProb;
+        };
+        return f;
+    }
+
+    public static double optimize(UnivariateFunction f, double relTol, double absTol, int maxEval, double startingPoint) {
+        final double lowerBound = 0.0, upperBound = 2;
+        BrentOptimizer opt = new BrentOptimizer(relTol, absTol);
+        UnivariatePointValuePair sol = opt.optimize(
+                new MaxEval(maxEval),
+                new UnivariateObjectiveFunction(f),
+                GoalType.MAXIMIZE,
+                new SearchInterval(lowerBound, upperBound, startingPoint)
+        );
+        return sol.getPoint();
+    }
+}

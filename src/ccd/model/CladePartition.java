@@ -295,6 +295,32 @@ public class CladePartition {
         }
     }
 
+    /**
+     * Returns the conditional clade probability of this partition as if the tree
+     * this partition belongs to is not in the CCD, with regularisation applied.
+     * This CCP is locally (not recursively), so only the probability of this
+     * partition of child clades appearing under the parent clade.
+     *
+     * @param alpha the pseudocount X for regularisation AdditiveX
+     * @return the conditional clade probability of this partition
+     */
+    public double getCCPInHeldOutTree(double alpha) {
+        if (ccpSet) {
+            return ccp;
+        } else {
+            if (this.getParentClade().getNumberOfOccurrences() == 0) {
+                throw new AssertionError("Clade with zero occurrences detected - tidy up?");
+            }
+            int numOfAlphas = this.getParentClade().getNumberOfPartitions();
+            double result = (this.numOccurrences - 1 + alpha) /
+                    (this.getParentClade().getNumberOfOccurrences() + (alpha * numOfAlphas) - 1);
+            if (result < 0) {
+                throw new IllegalStateException("Computed probability is negative: " + result);
+            }
+            return result;
+        }
+    }
+
     /* Precompute log values for quick lookup */
     private static double[] logTable;
 
@@ -334,6 +360,30 @@ public class CladePartition {
             }
         } else {
             return Math.log(this.ccp);
+        }
+    }
+
+    /**
+     * Returns the log of the conditional clade probability of this partition
+     * as if the tree this partition belongs to is not in the CCD, with
+     * regularisation applied. This CCP is locally (not recursively), so only
+     * the probability of this partition of child clades appearing under the
+     * parent clade.
+     *
+     * @param alpha the pseudocount X for regularisation AdditiveX
+     * @return the conditional clade probability of this partition
+     */
+    public double getLogCCPInHeldOutTree(double alpha) {
+        if (ccpSet) {
+            return ccp;
+        } else {
+            if (this.getParentClade().getNumberOfOccurrences() == 0) {
+                throw new AssertionError("Clade with zero occurrences detected - tidy up?");
+            }
+            int numOfAlphas = this.getParentClade().getNumberOfPartitions();
+            double result = Math.log(this.numOccurrences - 1 + alpha) -
+                    Math.log(this.getParentClade().getNumberOfOccurrences() + (alpha * numOfAlphas) - 1);
+            return result;
         }
     }
 

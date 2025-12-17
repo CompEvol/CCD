@@ -1,7 +1,9 @@
 package ccd.model;
 
+import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator.TreeSet;
+import ccd.model.bitsets.BitSet;
 
 import java.util.List;
 
@@ -147,6 +149,70 @@ public class CCD1 extends AbstractCCD {
     @Override
     protected double getNumberOfParameters() {
         return this.getNumberOfCladePartitions();
+    }
+
+    public double getProbOfHeldOutTree(Tree tree, double alpha) {
+        resetCacheIfProbabilitiesDirty();
+
+        double[] runningProbability = new double[]{1};
+        computeProbOfVertexInHeldOutTree(tree.getRoot(), runningProbability, alpha, false);
+
+        return runningProbability[0];
+    }
+
+    public double getLogProbOfHeldOutTree(Tree tree, double alpha) {
+        resetCacheIfProbabilitiesDirty();
+
+        double[] runningProbability = new double[]{0};
+        computeProbOfVertexInHeldOutTree(tree.getRoot(), runningProbability, alpha, true);
+
+        return runningProbability[0];
+    }
+
+    private Clade computeProbOfVertexInHeldOutTree(Node vertex, double[] runningProbability, double alpha, boolean computeLog) {
+        BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
+
+        if (vertex.isLeaf()) {
+            int index = vertex.getNr();
+            cladeInBits.set(index);
+
+            // leaf has probability 1, so no changes to runningProbability
+
+            return cladeMapping.get(cladeInBits);
+        } else {
+            Clade firstChildClade = computeProbOfVertexInHeldOutTree(vertex.getChildren().get(0), runningProbability, alpha, computeLog);
+            Clade secondChildClade = computeProbOfVertexInHeldOutTree(vertex.getChildren().get(1), runningProbability, alpha, computeLog);
+
+            if (computeLog && runningProbability[0] > 0) {
+                runningProbability[0] = 0;
+            }
+
+            if ((firstChildClade == null) || (secondChildClade == null)) {
+                setComputedNoProbability(runningProbability, computeLog);
+                return null;
+            }
+
+            cladeInBits.or(firstChildClade.getCladeInBits());
+            cladeInBits.or(secondChildClade.getCladeInBits());
+
+            Clade currentClade = cladeMapping.get(cladeInBits);
+            if (currentClade != null && currentClade.getNumberOfOccurrences() != 1) {
+                CladePartition partition = currentClade.getCladePartition(firstChildClade, secondChildClade);
+                if (partition != null) {
+                    if (computeLog) {
+                        runningProbability[0] += partition.getLogCCPInHeldOutTree(alpha);
+                    } else {
+                        runningProbability[0] *= partition.getCCPInHeldOutTree(alpha);
+                    }
+                } else {
+                    setComputedNoProbability(runningProbability, computeLog);
+                }
+            } else {
+                setComputedNoProbability(runningProbability, computeLog);
+            }
+
+            return currentClade;
+        }
     }
 
 }

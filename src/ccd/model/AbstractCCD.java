@@ -1330,7 +1330,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
     }
 
-    private static void setComputedNoProbability(double[] runningProbability, boolean computeLog) {
+    protected static void setComputedNoProbability(double[] runningProbability, boolean computeLog) {
         if (computeLog) {
             runningProbability[0] = Double.NEGATIVE_INFINITY;
         } else {
