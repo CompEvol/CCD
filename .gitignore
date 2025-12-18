@@ -4,3 +4,6 @@ release/
 
 # OS X ignores
 .DS_Store
+
+out/
+.idea/

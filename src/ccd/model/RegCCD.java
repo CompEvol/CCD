@@ -5,21 +5,24 @@ import beastfx.app.treeannotator.TreeAnnotator;
 import ccd.algorithms.regularisation.CCDExpansion;
 import ccd.algorithms.regularisation.CCD1Regularisor;
 import ccd.algorithms.regularisation.CCDRegularisationStrategy;
-
 import java.util.List;
 
 public class RegCCD extends CCD1 {
 
     public RegCCD(List<Tree> trees, double burnin) {
         super(trees, burnin);
-        expandRegCCD();
-        regulariseRegCCD();
+        postConstruction();
     }
 
     public RegCCD(TreeAnnotator.TreeSet treeSet) {
         super(treeSet, true);
+        postConstruction();
+    }
+
+    protected void postConstruction() {
         expandRegCCD();
         regulariseRegCCD();
+        System.out.println("Regularisation on CCD with default parameter = 0.4 is done");
     }
 
     @Override
@@ -33,7 +36,7 @@ public class RegCCD extends CCD1 {
     }
 
     public void regulariseRegCCD() {
-        CCD1Regularisor regulariser = new CCD1Regularisor(CCDRegularisationStrategy.AdditiveX, 0.5);
+        CCD1Regularisor regulariser = new CCD1Regularisor(CCDRegularisationStrategy.AdditiveX, 0.4);
         regulariser.regularise(this);
     }
 }
