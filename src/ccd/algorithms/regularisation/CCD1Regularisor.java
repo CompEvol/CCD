@@ -19,7 +19,7 @@ public class CCD1Regularisor {
         this.strategy = strategy;
     }
 
-    public void regularize(CCD1 ccd) {
+    public void regularise(CCD1 ccd) {
         boolean priorBasedStrategy = (strategy == CCDRegularisationStrategy.PriorOne) || (strategy == CCDRegularisationStrategy.PriorScaled);
         // we use a table for caching prior probabilities (if needed for strategy)
         double[][] priorProbabilityTable = priorBasedStrategy ? new double[ccd.getNumberOfLeaves()][] : null;
