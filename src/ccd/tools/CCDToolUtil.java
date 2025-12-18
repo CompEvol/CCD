@@ -9,6 +9,8 @@ import ccd.model.CCD0;
 import ccd.model.CCD1;
 import ccd.model.CCD2;
 import ccd.model.CCDType;
+import ccd.model.OptRegCCD;
+import ccd.model.RegCCD;
 
 import java.io.IOException;
 
@@ -63,6 +65,24 @@ public class CCDToolUtil {
             ccd = new CCD1(treeSet);
         } else if (ccdType == CCDType.CCD2) {
             ccd = new CCD2(treeSet);
+        } else {
+            throw new IllegalArgumentException("Illegal CCD type.");
+        }
+        return ccd;
+    }
+
+    public static AbstractCCD getCCDTypeByName(TreeAnnotator.MemoryFriendlyTreeSet treeSet, CCDType ccdType) {
+        AbstractCCD ccd;
+        if (ccdType == CCDType.CCD0) {
+            ccd = new CCD0(treeSet);
+        } else if (ccdType == CCDType.CCD1) {
+            ccd = new CCD1(treeSet);
+        } else if (ccdType == CCDType.CCD2) {
+            ccd = new CCD2(treeSet);
+        } else if (ccdType == CCDType.RegCCD) {
+            ccd = new RegCCD(treeSet);
+        } else if (ccdType == CCDType.OptRegCCD) {
+            ccd = new OptRegCCD(treeSet);
         } else {
             throw new IllegalArgumentException("Illegal CCD type.");
         }

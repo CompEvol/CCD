@@ -22,7 +22,7 @@ public class CCDSampler extends Runnable {
     final public Input<TreeFile> treeInput = new Input<>("trees", "trees file to construct CCD with and analyse", Input.Validate.REQUIRED);
     final public Input<String> outputInput = new Input<>("out", "file name for output newick trees", Input.Validate.REQUIRED);
     final public Input<Integer> burnInPercentageInput = new Input<>("burnin", "percentage of trees to used as burn-in (and will be ignored)", 10);
-    final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0 or CCD1", "CCD0");
+    final public Input<CCDType> ccdTypeInput = new Input<>("ccdType", "type of CCD, e.g. CCD0 or CCD1", CCDType.CCD0, CCDType.values());
     final public Input<Integer> sampleSizeInput = new Input<>("length", "number of trees sampled from CCD", 1000);
     final public Input<Long> seedInput = new Input<>("seed", "seed for random for chain generation");
 
@@ -37,12 +37,12 @@ public class CCDSampler extends Runnable {
         Log.info.println("> with the following parameters...");
         Log.info.println("    trees file:  " + treeInput.get().getPath());
         Log.info.println("    burnin:      " + burnInPercentageInput.get());
-        Log.info.println("    CCD type:    " + CCDType.fromName(ccdTypeInput.get()));
+        Log.info.println("    CCD type:    " + ccdTypeInput.get());
         Log.info.println("    #samples:    " + sampleSizeInput.get());
         Log.info.println("    output file: " + outputInput.get());
 
         TreeAnnotator.MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
-        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput);
+        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput.get());
 
         long seed = (seedInput.get() != null) ? seedInput.get() : System.currentTimeMillis();
         ccd.setRandom(new Random(seed));

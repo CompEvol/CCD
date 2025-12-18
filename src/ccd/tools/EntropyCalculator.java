@@ -23,7 +23,7 @@ public class EntropyCalculator extends beast.base.inference.Runnable {
     final public Input<OutFile> outputInput = new Input<>("output", "name of the output file to store results. If not specified, use stdout");
 
     // configuration
-    final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0, CCD1, or CCD2", "CCD0");
+    final public Input<CCDType> ccdTypeInput = new Input<>("ccdType", "CCD type, e.g. CCD0, CCD1, or CCD2", CCDType.CCD0, CCDType.values());
 
     @Override
     public void initAndValidate() {
@@ -48,11 +48,11 @@ public class EntropyCalculator extends beast.base.inference.Runnable {
 		        Log.info("> with the following parameters...");
 		        Log.info("    trees file: " + treefile.getPath());
 		        Log.info("    burnin:     " + burnInPercentageInput.get());
-		        Log.info("    CCD type:   " + CCDType.fromName(ccdTypeInput.get()));
+		        Log.info("    CCD type:   " + ccdTypeInput.get());
     		}
 	
 	        MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treefile.getPath(), burnInPercentageInput.get());
-	        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput);
+	        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput.get());
 	        
 	        double entropy = ccd.getEntropy();
 	

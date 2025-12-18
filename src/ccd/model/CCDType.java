@@ -24,9 +24,21 @@ public enum CCDType {
         public AbstractCCD emptyCCDOfType(int numberOfLeaves) {
             return new CCD2(numberOfLeaves, false);
         }
+    },
+    RegCCD("RegCCD") {
+        @Override
+        public AbstractCCD emptyCCDOfType(int numberOfLeaves) {
+            return new RegCCD(numberOfLeaves);
+        }
+    },
+    OptRegCCD("OptRegCCD") {
+        @Override
+        public AbstractCCD emptyCCDOfType(int numberOfLeaves) {
+            return new OptRegCCD(numberOfLeaves);
+        }
     };
 
-    String ccdType;
+	String ccdType;
 
     CCDType(String description) {
         this.ccdType = description;

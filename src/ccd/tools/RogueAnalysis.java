@@ -35,7 +35,7 @@ public class RogueAnalysis extends Runnable {
 
     // configuration
     // - for rogue score
-    final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0 or CCD1", "CCD0");
+    final public Input<CCDType> ccdTypeInput = new Input<>("ccdType", "CCD type, e.g. CCD0 or CCD1", CCDType.CCD0, CCDType.values());
     final public Input<Integer> maxCladeSizeInput = new Input<>("maxCladeSize", "maximum size for clade to be analysed", 10);
     final public Input<Double> minProbabilityInput = new Input<>("minProbability", "minimum probability for clade to be analysed", 0.1);
 
@@ -67,11 +67,11 @@ public class RogueAnalysis extends Runnable {
         System.out.println("> with the following parameters...");
         System.out.println("    trees file: " + treeInput.get().getPath());
         System.out.println("    burnin:     " + burnInPercentageInput.get());
-        System.out.println("    CCD type:   " + CCDType.fromName(ccdTypeInput.get()));
+        System.out.println("    CCD type:   " + ccdTypeInput.get());
 
         // create base CCD
         MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
-        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput);
+        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput.get());
         ccd.computeCladeProbabilities();
 
         // computation

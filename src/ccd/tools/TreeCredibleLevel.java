@@ -14,6 +14,7 @@ import ccd.algorithms.credibleSets.ICredibleSet;
 import ccd.algorithms.credibleSets.ProbabilityBasedCredibleSetComputer;
 import ccd.model.AbstractCCD;
 import ccd.model.CCD0;
+import ccd.model.CCDType;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -29,7 +30,7 @@ public class TreeCredibleLevel extends beast.base.inference.Runnable {
 
     // configuration
     final public Input<Boolean> quietInput = new Input<>("quiet", "'true' to only output entropy value and nothing else, 'false' otherwise", false);
-    final public Input<String> ccdTypeInput = new Input<>("ccdType", "CCD0, CCD1, or CCD2", "CCD1");
+    final public Input<CCDType> ccdTypeInput = new Input<>("ccdType", "CCD type, e.g. CCD0 or CCD1", CCDType.CCD0, CCDType.values());
     final public Input<String> methodInput = new Input<>("method", "'probability' for a probability-based credible set (default), " +
             "'credibleCCD' for a credible CCD", "probability");
     final public Input<Integer> numSamplesInput = new Input<>("numsamples",
@@ -59,7 +60,7 @@ public class TreeCredibleLevel extends beast.base.inference.Runnable {
 
         // init CCD
         MemoryFriendlyTreeSet treeSetCCD = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
-        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSetCCD, ccdTypeInput);
+        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSetCCD, ccdTypeInput.get());
         ccd.computeCladeProbabilities();
 
         // init test tree

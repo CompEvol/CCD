@@ -9,6 +9,10 @@ import java.util.List;
 
 public class RegCCD extends CCD1 {
 
+    public RegCCD(int numLeaves) {
+        super(numLeaves, true);
+    }
+
     public RegCCD(List<Tree> trees, double burnin) {
         super(trees, burnin);
         postConstruction();

@@ -6,7 +6,11 @@ import ccd.algorithms.regularisation.CCDRegularisationStrategy;
 import ccd.algorithms.regularisation.RegCCDParameterOptimiser;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
-public class OptRegCCD extends RegCCD{
+public class OptRegCCD extends RegCCD {
+
+    public OptRegCCD(int numLeaves) {
+        super(numLeaves);
+    }
 
     public OptRegCCD(TreeAnnotator.TreeSet treeSet) {
         super(treeSet);
