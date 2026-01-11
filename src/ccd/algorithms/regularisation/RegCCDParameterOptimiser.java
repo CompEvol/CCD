@@ -12,36 +12,31 @@ import org.apache.commons.math3.optim.univariate.UnivariateObjectiveFunction;
 import org.apache.commons.math3.optim.univariate.UnivariatePointValuePair;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
 
 public class RegCCDParameterOptimiser {
 
-    public static UnivariateFunction defineFunction(RegCCD regCCD, TreeAnnotator.TreeSet treeSet) {
+    public static UnivariateFunction defineFunction(RegCCD ccd, List<Tree> treeList) {
 
         UnivariateFunction f = alpha -> {
 
             double totalLogProb = 0.0;
             int nonNegInfLogProbTreeCount = 0;
 
-            try {
-                treeSet.reset();
-                while (treeSet.hasNext()) {
-                    Tree currentTree = treeSet.next();
-                    double prob = regCCD.getProbOfHeldOutTree(currentTree, alpha);
-                    double logProb = regCCD.getLogProbOfHeldOutTree(currentTree, alpha);
-                    if (logProb != Double.NEGATIVE_INFINITY) {
-                        totalLogProb += logProb;
-                        nonNegInfLogProbTreeCount++;
-                    }
-                    if ((logProb != Double.NEGATIVE_INFINITY && prob == 0) ||
-                            (logProb == Double.NEGATIVE_INFINITY && prob != 0)) {
-                        throw new IllegalStateException(String.format("Inconsistent probability detected: prob = %g, logProb = %g", prob, logProb));
-                    }
+            for (int j = 0; j < treeList.size(); j++) { // loop through input tree set
+                Tree testTree = treeList.get(j);
+                double prob = ccd.getProbOfHeldOutTree(testTree, alpha);
+                double logProb = ccd.getLogProbOfHeldOutTree(testTree, alpha);
+                if (logProb != Double.NEGATIVE_INFINITY) {
+                    totalLogProb += logProb;
+                    nonNegInfLogProbTreeCount++;
                 }
-                double avgLogProb = totalLogProb / nonNegInfLogProbTreeCount;
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                if ((logProb != Double.NEGATIVE_INFINITY && prob == 0) ||
+                        (logProb == Double.NEGATIVE_INFINITY && prob != 0)) {
+                    throw new IllegalStateException(String.format("Inconsistent probability detected: prob = %g, logProb = %g", prob, logProb));
+                }
             }
-
             double avgLogProb = totalLogProb / nonNegInfLogProbTreeCount;
             System.out.println(String.format("testing alpha = %.5f, avgLogProb = %.5f", alpha, avgLogProb));
             return avgLogProb;

@@ -1,15 +1,22 @@
 package ccd.model;
 
+import beast.base.evolution.tree.Tree;
 import beastfx.app.treeannotator.TreeAnnotator;
 import ccd.algorithms.regularisation.CCD1Regularisor;
 import ccd.algorithms.regularisation.CCDRegularisationStrategy;
 import ccd.algorithms.regularisation.RegCCDParameterOptimiser;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 
+import java.util.List;
+
 public class OptRegCCD extends RegCCD {
 
     public OptRegCCD(int numLeaves) {
         super(numLeaves);
+    }
+
+    public OptRegCCD(List<Tree> trees, double burnin) {
+        super(trees, burnin);
     }
 
     public OptRegCCD(TreeAnnotator.TreeSet treeSet) {
@@ -30,7 +37,7 @@ public class OptRegCCD extends RegCCD {
     }
 
     public double getOptimalAlpha() {
-        UnivariateFunction f = RegCCDParameterOptimiser.defineFunction(this, this.baseTreeSet);
+        UnivariateFunction f = RegCCDParameterOptimiser.defineFunction(this, this.baseTrees);
         double threshold = 1e-6;
         double startingPoint;
         do { startingPoint = Math.random(); } while (startingPoint == 0.0);
