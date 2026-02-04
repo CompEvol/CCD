@@ -212,7 +212,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /**
-     * Constructor to start with an empty CDD graph. Trees can then be processed
+     * Constructor to start with an empty CCD graph. Trees can then be processed
      * one by one.
      *
      * @param numLeaves  number of leaves of the trees that this CCD will be based on

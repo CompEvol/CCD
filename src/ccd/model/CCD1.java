@@ -88,7 +88,7 @@ public class CCD1 extends AbstractCCD {
     }
 
     /**
-     * Constructor for an empty CDD. Trees can then be processed one by one.
+     * Constructor for an empty CCD. Trees can then be processed one by one.
      *
      * @param numLeaves      number of leaves of the trees that this CCD will be based on
      * @param storeBaseTrees whether to store the trees used to create this CCD;

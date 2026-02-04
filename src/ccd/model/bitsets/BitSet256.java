@@ -131,6 +131,31 @@ public class BitSet256 extends BitSet {
     }
 
     /**
+     * Returns the value of the bit with the specified index. The value
+     * is {@code true} if the bit with the index {@code bitIndex}
+     * is currently set in this {@code BitSet}; otherwise, the result
+     * is {@code false}.
+     *
+     * @param bitIndex the bit index
+     * @return the value of the bit with the specified index
+     * @throws IndexOutOfBoundsException if the specified index is negative
+     */
+    public boolean get(int bitIndex) {
+        if (bitIndex < 0)
+            throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+
+        if (bitIndex < 64){
+            return ((word1 & (1L << bitIndex)) != 0);
+        } else if (bitIndex < 128) {
+            return ((word2 & (1L << bitIndex)) != 0);
+        } else if (bitIndex < 192) {
+            return ((word3 & (1L << bitIndex)) != 0);
+        } else {
+            return ((word4 & (1L << bitIndex)) != 0);
+        }
+    }
+
+    /**
      * Performs a logical <b>OR</b> of this bit set with the bit set
      * argument. This bit set is modified so that a bit in it has the
      * value {@code true} if and only if it either already had the

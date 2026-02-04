@@ -511,7 +511,7 @@ public class Clade {
     }
 
     /**
-     * @return the number of child clades of this clade
+     * @return the number of parent clades of this clade
      */
     public int getNumberOfParentClades() {
         return parentClades.size();
