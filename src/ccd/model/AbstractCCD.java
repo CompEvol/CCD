@@ -1533,13 +1533,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /*-- DISTANCES - DISTANCES -- */
 
     /**
-     * Returns the average RF distance of the given tree to the trees of this
+     * Returns the expected RF distance of the given tree to the trees of this
      * CCD weighted by their probability.
      *
      * @param tree whose average RF distance we compute
      * @return average RF distance of the given tree to this CCD
      */
-    public double averageRFDistances(Tree tree) {
+    public double expectedRFDistances(Tree tree) {
         WrappedBeastTree wrappedTree = new WrappedBeastTree(tree);
         HashMap<Clade, Double> cladeRFs = new HashMap<Clade, Double>(this.cladeMapping.size());
         return averageRFDistance(this.rootClade, wrappedTree, cladeRFs);
