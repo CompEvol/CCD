@@ -134,6 +134,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         List<Tree> treesToUse;
         if (burnin == 0) {
             treesToUse = trees;
+            this.numBaseTrees = trees.size();
         } else {
             int numDiscardedTrees = (int) (trees.size() * burnin);
             int numUsedTrees = trees.size() - numDiscardedTrees;
