@@ -33,6 +33,27 @@ mvn clean verify
 
 This produces `target/CCD.v1.2.0.zip` (the BEAST package) and `target/ccd-1.2.0-SNAPSHOT.jar`.
 
+### Running from Maven
+
+After building, you can run BEAST tools with CCD on the module path using `mvn exec:exec`.
+
+Run TreeAnnotator with CCD0 topology:
+
+```bash
+mvn exec:exec \
+  -Dbeast.module=beast.fx \
+  -Dbeast.main=beastfx.app.treeannotator.TreeAnnotator \
+  -Dbeast.args="-topology CCD0 -height mean -burnin 10 input.trees output.tree"
+```
+
+Available topologies: `CCD0`, `CCD1`, `CCD2`, `CCD0Approx`, `HIPSTR`.
+
+Run BEAST with CCD on the module path:
+
+```bash
+mvn exec:exec -Dbeast.args="examples/myanalysis.xml"
+```
+
 ## Usage
 
 ### Point Estimates
