@@ -1,6 +1,5 @@
-<package name='CCD' version='1.1.0'>
-	<depends on='BEAST.base' atleast='2.7.7'/>
-	<depends on='BEAST.app' atleast='2.7.7'/>
+<package name='CCD' version='1.2.0'>
+    <depends on='BEAST.base' atleast='2.8.0'/>
 
     <service type="beastfx.app.treeannotator.services.TopologySettingService">
         <provider classname="ccd.tools.CCD0PointEstimate"/>
@@ -8,6 +7,15 @@
         <provider classname="ccd.tools.CCD2PointEstimate"/>
         <provider classname="ccd.tools.CCD0ApproxPointEstimate"/>
         <provider classname="ccd.tools.HIPSTR"/>
+    </service>
+
+    <service type="beast.base.core.BEASTInterface">
+        <provider classname="ccd.tools.CCDSampler"/>
+        <provider classname="ccd.tools.EntropyCalculator"/>
+        <provider classname="ccd.tools.SkeletonAnalysis"/>
+        <provider classname="ccd.tools.RogueAnalysis"/>
+        <provider classname="ccd.tools.DissonanceCalculator"/>
+        <provider classname="ccd.tools.TreeCredibleLevel"/>
     </service>
 
     <packageapp description="CCD Sampler" class="ccd.tools.CCDSampler" args=""/>
