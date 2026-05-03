@@ -1,4 +1,4 @@
-## CCD Package for [BEAST 2](https://www.beast2.org/)
+# CCD Package for [BEAST 3](https://github.com/CompEvol)
 
 Implementation of the conditional clade distribution (CCD), which offers estimators of the posterior tree (topology) distribution learned from the sample, as well as associated tools and algorithms.
 Three parametrisations of a CCD are implemented, namely, based on clade frequencies (CCD0), clade split frequencies (CCD1), and pairs of clade split frequencies (CCD2).
@@ -9,55 +9,63 @@ The package further includes tools for entropy-based rogue analysis and rogue re
 See the [CCD-Research repository](https://github.com/CompEvol/CCD-Research) for information, scripts, and data of the associated research papers,
 and see the instructions below on how to use the tools.
 
-## Install the package
+## Maven coordinates
 
-### Installing through BEAUti
+```xml
+<dependency>
+    <groupId>io.github.compevol</groupId>
+    <artifactId>ccd</artifactId>
+    <version>1.2.0</version>
+</dependency>
+```
 
-CCD is a [BEAST2](http://beast2.org) package that requires BEAST 2 v2.7.6.
-If you have not already done so, you can get BEAST 2 from [here](http://beast2.org).
+JPMS module name: `ccd`
 
-To install CCD, it is easiest to start BEAUti (a program that is part of BEAST), and select the menu `File/Manage packages`. A package manager dialog pops up, that looks something like this:
+## Build from source
 
-![Package Manager](https://github.com/CompEvol/CCD/raw/master/doc/package_repos.png)
+Requires JDK 25+.
 
-If the CCD package is listed, just click on it to select it, and hit the `Install/Upgrade` button.
+```bash
+git clone https://github.com/CompEvol/CCD.git
+cd CCD
+mvn clean verify
+```
 
-If the CCD package is not listed, you may need to add a package repository by clicking the `Package repositories` button. A window pops up where you can click `Add URL` and add `https://raw.githubusercontent.com/CompEvol/CBAN/master/packages-extra-2.7.xml` in the entry. After clicking OK, the dialog should look something like this:
+This produces `target/CCD.v1.2.0.zip` (the BEAST package) and `target/ccd-1.2.0-SNAPSHOT.jar`.
 
-![Package Repositories](https://github.com/CompEvol/CCD/raw/master/doc/package_repos0.png)
+### Running from Maven
 
-Click OK and now CCD should be listed in the package manager (as in the first dialog above). Select and click Install/Upgrade to install.
+After building, you can run BEAST tools with CCD on the module path using `mvn exec:exec`.
 
-### Install by hand
+Run TreeAnnotator with CCD0 topology:
 
-* Download the package from [here](https://github.com/CompEvol/CCD/releases/download/v0.0.1/CCD.package.v0.0.4.zip)
-* Create CCD directory inside BEAST package directory
-  * for Windows in Users\<YourName>\BEAST\2.X\VSS
-  * for Mac in /Users/<YourName>\/Library/Application Support/BEAST/2.X/VSS
-  * for Linux /home/<YourName>/.beast/2.X/VSS
-  Here <YourName> is the username you use, and in “2.X” the X refers to the major version of BEAST, so 2.X=2.7 for version 2.7.6.
-* Unzip the file `CCD.package.v0.0.1.zip` inside the CCD directory
+```bash
+mvn exec:exec \
+  -Dbeast.module=beast.fx \
+  -Dbeast.main=beastfx.app.treeannotator.TreeAnnotator \
+  -Dbeast.args="-topology CCD0 -height mean -burnin 10 input.trees output.tree"
+```
 
-## Build from code
+Available topologies: `CCD0`, `CCD1`, `CCD2`, `CCD0Approx`, `HIPSTR`.
 
-* Get code for beast2, BeastFX and CCD repositories:
-  * git clone https://github.com/CompEvol/beast2.git
-  * git clone https://github.com/CompEvol/BeastFX.git
-  * git clone https://github.com/CompEvol/CCD.git
-* Run `ant install` from the CCD directory
-  
+Run BEAST with CCD on the module path:
+
+```bash
+mvn exec:exec -Dbeast.args="examples/myanalysis.xml"
+```
+
 ## Usage
 
 ### Point Estimates
 
-The tree topolgy point estimate provided by CCD's is called the CCD MAP tree and is best accessed through TreeAnnotator.
+The tree topology point estimate provided by CCD's is called the CCD MAP tree and is best accessed through TreeAnnotator.
 See also the general [tutorial](https://beast2.blogs.auckland.ac.nz/treeannotator/);
 the steps are to start TreeAnnotator, and select `MAP (CCD0)` from the drop down box next to `Target tree type`:
 
 ![tree annotator](doc/treeannotator.png)
 
 TreeAnnotator and thus the CCD point estimates can also be accessed from the terminal.
-Simply but `CCD0` as option for the topology (`-topology`).
+Simply put `CCD0` as option for the topology (`-topology`).
 In full, the call from a terminal for Linux and OS X would be
 
 ```
@@ -74,16 +82,16 @@ For CCD1 based point estimates select `MAP (CCD1)` from the drop down box in the
 
 ### Phylogenetic Entropy, Rogue & Skeleton Analysis
 
-The CCD package has three tools (small apps) to compute the phylogenetic entropy of a tree set, compute rogues scores for each clade, and conduct a skeleton anaylsis
-that can each be executed with [BEAST2's AppLauncher](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html). 
+The CCD package has three tools (small apps) to compute the phylogenetic entropy of a tree set, compute rogues scores for each clade, and conduct a skeleton analysis
+that can each be executed with BEAST's AppLauncher.
 Note that the given trees *need to be binary* and are assumed to be rooted; they are typically given by a NEXUS `.tree` file, but a list of Newick strings also works.
 For more information on the concepts see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1) 
 and for further information and example data see the [research paper repository](https://github.com/CompEvol/CCD-Research/tree/main/skeletonsAndRogues).
 
 
 #### Phylogenetic Entropy
-You can compute the **phylogenetic entropy** of your posterior tree distribution with [BEAST2's AppLauncher](http://www.beast2.org/2019/07/23/better-apps-for-the-beast-appstore.html).
-The tool `EntropyCalculator` computes the phylogenetic entrpoy of our posterior tree distribution (computed via CCD). You can call from the terminal with the following command:
+You can compute the **phylogenetic entropy** of your posterior tree distribution with BEAST's AppLauncher.
+The tool `EntropyCalculator` computes the phylogenetic entropy of your posterior tree distribution (computed via CCD). You can call from the terminal with the following command:
 ```
 /path/to/applauncher EntropyCalculator -trees /path/to/treeInputFile.trees -burnin 10 -ccdType CCD0
 ```
@@ -136,7 +144,7 @@ and `NumTopologies` (clade whose removal reduces the number of trees in the CCD 
 - `minProbability`: minimum probability for clade to analyse (used to speed up computation, default: `0.5`)
   
 If you further specify an output file, then the given tree set will be reduced/filtered to the remaining taxa
-- `out`: reduced tree output file; th given tree set will not be filtered if not specified
+- `out`: reduced tree output file; the given tree set will not be filtered if not specified
 - `exclude`: file name of text file containing taxa to exclude from filtering - can be comma, tab or newline delimited
 
 ### Credible Level Evaluation
@@ -153,7 +161,3 @@ The app has the following parameters:
 - `method`: whether to use probability-based method (`probability`, default) or a credible CCD (`credibleCCD`)
 For the probability-based method the following two parameters can be set:
 - `numsamples`: the number of trees sampled from the CCD to compute the credible level thresholds (default: `10000`)
-
-
-
-
