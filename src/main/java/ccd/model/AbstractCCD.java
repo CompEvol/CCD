@@ -133,8 +133,8 @@ public abstract class AbstractCCD implements ITreeDistribution {
         this.burnin = burnin;
         List<Tree> treesToUse;
         if (burnin == 0) {
-            treesToUse = trees;
             this.numBaseTrees = trees.size();
+            treesToUse = trees;
         } else {
             int numDiscardedTrees = (int) (trees.size() * burnin);
             int numUsedTrees = trees.size() - numDiscardedTrees;
@@ -142,7 +142,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
             treesToUse = new ArrayList<Tree>(numUsedTrees);
             treesToUse.addAll(trees.subList(numDiscardedTrees, trees.size()));
         }
-
+        // initializeRootClade(treesToUse.get(0).getLeafNodeCount());
         for (Tree tree : treesToUse) {
             cladifyTree(tree);
         }
@@ -265,7 +265,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Recursive helper method */
-    private Clade cladifyVertex(Node vertex) {
+    protected Clade cladifyVertex(Node vertex) {
         BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
         Clade firstChildClade = null;
         Clade secondChildClade = null;
@@ -314,6 +314,23 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /**
+     * Returns the clade for the given BitSet, creating and adding it (with zero
+     * occurrences) if it does not exist yet. Intended for graph-expansion
+     * algorithms that introduce novel clades (e.g. NNI clade expansion); the
+     * given BitSet is cloned so the caller may reuse it.
+     *
+     * @param cladeInBits BitSet describing the clade
+     * @return the existing or newly created clade
+     */
+    public Clade getOrCreateClade(BitSet cladeInBits) {
+        Clade clade = cladeMapping.get(cladeInBits);
+        if (clade == null) {
+            clade = addNewClade((BitSet) cladeInBits.clone());
+        }
+        return clade;
+    }
+
+    /**
      * Removes the given tree from set of trees the CCD graph is based on
      * (reduces the number of occurrences for each of the tree's clades and
      * partitions by one). The behavior is unspecified if tree wasn't used
@@ -340,7 +357,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Recursive helper method */
-    private Clade reduceCladeCount(Node vertex) {
+    protected Clade reduceCladeCount(Node vertex) {
         // 1. build BitSet to retrieve clade and call recursion
         BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
         Clade firstChildClade = null;
@@ -511,6 +528,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /* -- GENERAL & CCD GRAPH GETTERS -- */
 
     /**
+     * @return whether the given clade has a sampled ancestor at its root under this CCD model
+     */
+    public boolean isSampledAncestor(Clade clade) {
+        return false; // default AbstractCCD is not a sampled ancestor model
+    }
+
+    /**
      * @return number of leaves/taxa of the trees this CCD is build on (which
      * might be less than the taxa existing in this CCD, namely, if it
      * is filtered)
@@ -538,6 +562,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return rootClade;
     }
 
+    /**
+     * Number of clades including leaves and the root.
+     * A sampled ancestor leaf is counted as a different leaf from a normal leaf.
+     * TODO might want to not double count sampled ancestor leaves
+     *
+     * @return number of clades
+     */
     @Override
     public int getNumberOfClades() {
         return cladeMapping.size();
@@ -721,7 +752,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
                 testro += partition.getProbability() * logS;
             }
         }
-
         return -testro;
     }
 
@@ -877,7 +907,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Recursive helper method */
-    private Node getVertexBasedOnStrategy(Clade clade, SamplingStrategy samplingStrategy, HeightSettingStrategy heightStrategy) {
+    protected Node getVertexBasedOnStrategy(Clade clade, SamplingStrategy samplingStrategy, HeightSettingStrategy heightStrategy) {
         // computeCladeProbabilitiesIfDirty();
 
         Node vertex = null;
@@ -906,70 +936,95 @@ public abstract class AbstractCCD implements ITreeDistribution {
             Node secondChild = getVertexBasedOnStrategy(partition.getChildClades()[1],
                     samplingStrategy, heightStrategy);
 
-            // These are not needed and only make the output newick longer
-            vertex = new Node();
-            vertex.setNr(runningInnerIndex++);
-            double cladeProbability = clade.getProbability();
-            vertex.setMetaData(CLADE_SUPPORT_KEY, cladeProbability);
-            String posteriorSupport = CLADE_SUPPORT_KEY + "=" + cladeProbability;
-            if (vertex.metaDataString != null) {
-                vertex.metaDataString += "," + posteriorSupport;
-            } else {
-                vertex.metaDataString = posteriorSupport;
+            vertex = buildInternalVertex(clade, partition, firstChild, secondChild, heightStrategy);
+        }
+
+        return vertex;
+    }
+
+    /**
+     * Builds an internal (non-leaf) vertex for the two already-constructed child subtrees of
+     * the given {@code clade}, resolved through {@code partition}. Assigns the next inner-node
+     * number, attaches clade-support and (log-)subtree-probability metadata, and sets the height
+     * per the {@link HeightSettingStrategy}. Factored out of {@link #getVertexBasedOnStrategy}
+     * so subclasses (e.g. {@code KRegCCD}) can reuse the exact same observed-split construction
+     * while overriding the recursion.
+     */
+    protected Node buildInternalVertex(Clade clade, CladePartition partition,
+                                       Node firstChild, Node secondChild,
+                                       HeightSettingStrategy heightStrategy) {
+        // These are not needed and only make the output newick longer
+        Node vertex = new Node();
+        vertex.setNr(nextRunningInnerIndex());
+        double cladeProbability = clade.getProbability();
+        vertex.setMetaData(CLADE_SUPPORT_KEY, cladeProbability);
+        String posteriorSupport = CLADE_SUPPORT_KEY + "=" + cladeProbability;
+        if (vertex.metaDataString != null) {
+            vertex.metaDataString += "," + posteriorSupport;
+        } else {
+            vertex.metaDataString = posteriorSupport;
+        }
+        vertex.addChild(firstChild);
+        vertex.addChild(secondChild);
+
+        // attach probability information
+        Double p = (Double) firstChild.getMetaData(PROB_SUBTREE_KEY)
+                * (Double) secondChild.getMetaData(PROB_SUBTREE_KEY)
+                * partition.getCCP();
+        Double logP = (Double) firstChild.getMetaData(LOG_PROB_SUBTREE_KEY)
+                + (Double) secondChild.getMetaData(LOG_PROB_SUBTREE_KEY)
+                + partition.getLogCCP();
+        vertex.setMetaData(PROB_SUBTREE_KEY, p);
+        vertex.setMetaData(LOG_PROB_SUBTREE_KEY, logP);
+
+        if (heightStrategy == HeightSettingStrategy.MeanOccurredHeights) {
+            vertex.setHeight(clade.getMeanOccurredHeight());
+        } else if (heightStrategy == HeightSettingStrategy.One) {
+            vertex.setHeight(computeParentHeight(partition, firstChild, secondChild));
+        } else if (heightStrategy == HeightSettingStrategy.CommonAncestorHeights) {
+            // out.println("\nvertex = " + vertex);
+            // out.println("vertex.getHeight() = " + vertex.getHeight());
+            // out.println("clade.getCommonAncestorHeight() = " + clade.getCommonAncestorHeight());
+            vertex.setHeight(clade.getCommonAncestorHeight());
+            // out.println("vertex.getHeight() = " + vertex.getHeight());
+
+            if (Double.isNaN(clade.getCommonAncestorHeight())) {
+                System.err.println("\nNaN height!");
+                System.err.println("clade = " + clade);
+                System.err.println("clade.getCommonAncestorHeight() = " + clade.getCommonAncestorHeight());
             }
-            vertex.addChild(firstChild);
-            vertex.addChild(secondChild);
 
-            // attach probability information
-            Double p = (Double) firstChild.getMetaData(PROB_SUBTREE_KEY)
-                    * (Double) secondChild.getMetaData(PROB_SUBTREE_KEY)
-                    * partition.getCCP();
-            Double logP = (Double) firstChild.getMetaData(LOG_PROB_SUBTREE_KEY)
-                    + (Double) secondChild.getMetaData(LOG_PROB_SUBTREE_KEY)
-                    + partition.getLogCCP();
-            vertex.setMetaData(PROB_SUBTREE_KEY, p);
-            vertex.setMetaData(LOG_PROB_SUBTREE_KEY, logP);
-
-            if (heightStrategy == HeightSettingStrategy.MeanOccurredHeights) {
-                vertex.setHeight(clade.getMeanOccurredHeight());
-            } else if (heightStrategy == HeightSettingStrategy.One) {
-                double height = Math.max(firstChild.getHeight(), secondChild.getHeight()) + 1;
-                vertex.setHeight(height);
-            } else if (heightStrategy == HeightSettingStrategy.CommonAncestorHeights) {
-                // out.println("\nvertex = " + vertex);
-                // out.println("vertex.getHeight() = " + vertex.getHeight());
-                // out.println("clade.getCommonAncestorHeight() = " + clade.getCommonAncestorHeight());
-                vertex.setHeight(clade.getCommonAncestorHeight());
-                // out.println("vertex.getHeight() = " + vertex.getHeight());
-
-                if (Double.isNaN(clade.getCommonAncestorHeight())) {
-                    System.err.println("\nNaN height!");
-                    System.err.println("clade = " + clade);
-                    System.err.println("clade.getCommonAncestorHeight() = " + clade.getCommonAncestorHeight());
-                }
-
-                if (vertex.getHeight() < 0) {
-                    System.err.println("\nVertex with negative height");
-                    System.err.println("vertex.getHeight() = " + vertex.getHeight());
-                    System.err.println("clade.getCommonAncestorHeight =  " + clade.getCommonAncestorHeight());
-                    System.err.println("clade.getMeanOccurredHeight =  " + clade.getMeanOccurredHeight());
-                }
-                if ((vertex.getHeight() - vertex.getLeft().getHeight()) < 0) {
-                    System.err.println("\nNegative branch length, L");
-                    System.err.println("branchLength = " + (vertex.getHeight() - vertex.getLeft().getHeight()));
-                    System.err.println("parent = " + vertex);
-                    System.err.println("childL = " + vertex.getLeft());
-                }
-                if ((vertex.getHeight() - vertex.getRight().getHeight()) < 0) {
-                    System.err.println("\nNegative branch length, R");
-                    System.err.println("branchLength = " + (vertex.getHeight() - vertex.getLeft().getHeight()));
-                    System.err.println("parent = " + vertex);
-                    System.err.println("childR = " + vertex.getRight());
-                }
+            if (vertex.getHeight() < 0) {
+                System.err.println("\nVertex with negative height");
+                System.err.println("vertex.getHeight() = " + vertex.getHeight());
+                System.err.println("clade.getCommonAncestorHeight =  " + clade.getCommonAncestorHeight());
+                System.err.println("clade.getMeanOccurredHeight =  " + clade.getMeanOccurredHeight());
+            }
+            if ((vertex.getHeight() - vertex.getLeft().getHeight()) < 0) {
+                System.err.println("\nNegative branch length, L");
+                System.err.println("branchLength = " + (vertex.getHeight() - vertex.getLeft().getHeight()));
+                System.err.println("parent = " + vertex);
+                System.err.println("childL = " + vertex.getLeft());
+            }
+            if ((vertex.getHeight() - vertex.getRight().getHeight()) < 0) {
+                System.err.println("\nNegative branch length, R");
+                System.err.println("branchLength = " + (vertex.getHeight() - vertex.getLeft().getHeight()));
+                System.err.println("parent = " + vertex);
+                System.err.println("childR = " + vertex.getRight());
             }
         }
 
         return vertex;
+    }
+
+    /** Returns and advances the running inner-node index used when materialising sampled trees. */
+    protected int nextRunningInnerIndex() {
+        return runningInnerIndex++;
+    }
+
+    /* Helper method */
+    protected double computeParentHeight(CladePartition partition, Node firstChild, Node secondChild) {
+        return Math.max(firstChild.getHeight(), secondChild.getHeight()) + 1.0;
     }
 
     @Override
@@ -999,12 +1054,11 @@ public abstract class AbstractCCD implements ITreeDistribution {
     public double getMaxLogTreeProbability() {
         tidyUpCacheIfDirty();
         resetCacheIfProbabilitiesDirty();
-
         return this.rootClade.getMaxSubtreeLogCCP();
     }
 
     /* Helper method */
-    private CladePartition getPartitionBasedOnStrategy(Clade clade, SamplingStrategy samplingStrategy) {
+    protected CladePartition getPartitionBasedOnStrategy(Clade clade, SamplingStrategy samplingStrategy) {
         CladePartition partition = null;
         switch (samplingStrategy) {
             case MAP: {
@@ -1228,7 +1282,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Helper method */
-    private BitSet computeCladeToNodeMapping(Node vertex, Map<Clade, Node> map) {
+    protected BitSet computeCladeToNodeMapping(Node vertex, Map<Clade, Node> map) {
         BitSet bits;
         if (vertex.isLeaf()) {
             bits = BitSet.newBitSet(getSizeOfLeavesArray());
@@ -1247,7 +1301,6 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
         return bits;
     }
-
 
     /* -- PROBABILITY - PROBABILITY -- */
     protected void setToUseLogProbabilities() {
@@ -1284,7 +1337,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
     }
 
     /* Recursive helper method */
-    private Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability, boolean computeLog) {
+    protected Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability, boolean computeLog) {
         BitSet cladeInBits = BitSet.newBitSet(leafArraySize);
 
         if (vertex.isLeaf()) {
@@ -1534,13 +1587,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
     /*-- DISTANCES - DISTANCES -- */
 
     /**
-     * Returns the expected RF distance of the given tree to the trees of this
+     * Returns the average RF distance of the given tree to the trees of this
      * CCD weighted by their probability.
      *
      * @param tree whose average RF distance we compute
      * @return average RF distance of the given tree to this CCD
      */
-    public double expectedRFDistances(Tree tree) {
+    public double averageRFDistances(Tree tree) {
         WrappedBeastTree wrappedTree = new WrappedBeastTree(tree);
         HashMap<Clade, Double> cladeRFs = new HashMap<Clade, Double>(this.cladeMapping.size());
         return averageRFDistance(this.rootClade, wrappedTree, cladeRFs);
@@ -1689,6 +1742,10 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return "[number of leaves: " + this.getNumberOfLeaves() + ", number of clades: "
                 + this.getNumberOfClades() + ", max probability: " + this.getMaxTreeProbability()
                 + ", entropy: " + this.getEntropy() + ", taxa: " + this.getTaxaAsBitSet() + "]";
+    }
+
+    protected String getSampledAncestorInfoString(Clade clade) {
+        return "sampled ancestor = none";  // default: no sampled ancestor
     }
 
     public abstract void initialize();

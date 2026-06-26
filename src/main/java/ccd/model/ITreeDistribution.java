@@ -32,6 +32,8 @@ public interface ITreeDistribution {
      */
     public double sampleTreeProbability();
 
+    public double sampleTreeLogProbability();
+
     /**
      * Returns the tree (without heights set) with maximum probability in this
      * distribution.
@@ -59,6 +61,8 @@ public interface ITreeDistribution {
      * @return the probability of the given tree
      */
     public double getProbabilityOfTree(Tree tree);
+
+    public double getLogProbabilityOfTree(Tree tree);
 
     /**
      * Returns whether this distribution contains the given tree.

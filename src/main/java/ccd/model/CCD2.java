@@ -62,8 +62,8 @@ public class CCD2 extends AbstractCCD {
         this.burnin = burnin;
         List<Tree> treesToUse;
         if (burnin == 0) {
-            treesToUse = trees;
             this.numBaseTrees = trees.size();
+            treesToUse = trees;
         } else {
             int numDiscardedTrees = (int) (trees.size() * burnin);
             int numUsedTrees = trees.size() - numDiscardedTrees;
@@ -73,6 +73,7 @@ public class CCD2 extends AbstractCCD {
         }
 
         for (Tree tree : treesToUse) {
+            // cladifyTree(tree, model);
             cladifyTree(tree);
         }
     }
@@ -86,6 +87,7 @@ public class CCD2 extends AbstractCCD {
      *                {@link CCD2}
      */
     public CCD2(TreeSet treeSet) {
+        // this(treeSet, false, model);
         this(treeSet, false);
     }
 
@@ -116,6 +118,7 @@ public class CCD2 extends AbstractCCD {
 
             while (tree != null) {
                 this.numBaseTrees++;
+                // cladifyTree(tree, model);
                 cladifyTree(tree);
 
                 // report progress

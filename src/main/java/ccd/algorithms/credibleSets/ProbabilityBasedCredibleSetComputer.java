@@ -32,6 +32,7 @@ public class ProbabilityBasedCredibleSetComputer implements ICredibleSet {
 
     /** The stored probability thresholds determining the credible levels. */
     private double[] sampledProbabilities;
+    private double[] sampledLogProbabilities;
 
     /**
      * A probability-based credible set with default number of sampled trees and default precision (number of thresholds)
@@ -74,7 +75,8 @@ public class ProbabilityBasedCredibleSetComputer implements ICredibleSet {
         }
         this.precision = precision;
 
-        initializeCredibleSetInformation();
+        // initializeCredibleSetInformation();
+        initializeCredibleSetInformationLogSpace();
     }
 
     /* Initialization method. */
@@ -114,16 +116,54 @@ public class ProbabilityBasedCredibleSetComputer implements ICredibleSet {
         // }
     }
 
-    @Override
-    public double getCredibleLevel(Tree tree) {
-        // Double prob = (Double) tree.getRoot().getMetaData(AbstractCCD.PROB_SUBTREE_KEY);
-        double prob = treeDistribution.getProbabilityOfTree(tree);
-        if (prob == 0) {
-            return -1;
+    private void initializeCredibleSetInformationLogSpace() {
+
+        sampledLogProbabilities = new double[numSamples + 1];
+        sampledLogProbabilities[0] = Double.NEGATIVE_INFINITY;
+
+        for (int i = 1; i <= numSamples; i++) {
+            sampledLogProbabilities[i] = treeDistribution.sampleTreeLogProbability();
         }
 
-        int indexOfNextSmallest = findIndexOfNextSmallest(prob) + 1;
-        return (indexOfNextSmallest / (double) sampledProbabilities.length);
+        Arrays.sort(sampledLogProbabilities);
+
+        // reverse (descending order)
+        for (int i = 0; i < sampledLogProbabilities.length / 2; i++) {
+            int j = sampledLogProbabilities.length - 1 - i;
+            double tmp = sampledLogProbabilities[i];
+            sampledLogProbabilities[i] = sampledLogProbabilities[j];
+            sampledLogProbabilities[j] = tmp;
+        }
+
+        if (precision < numSamples) {
+            double[] down = new double[precision];
+            double stepSize = numSamples / (double) precision;
+
+            for (int i = 1; i <= precision; i++) {
+                int sampleIndex = (int) Math.round(i * stepSize);
+                down[i - 1] = sampledLogProbabilities[sampleIndex];
+            }
+
+            sampledLogProbabilities = down;
+        }
+    }
+
+    // @Override
+    // public double getCredibleLevel(Tree tree) {
+    //     double prob = treeDistribution.getProbabilityOfTree(tree);
+    //     if (prob == 0) {
+    //         return -1;
+    //     }
+    //     int indexOfNextSmallest = findIndexOfNextSmallest(prob) + 1;
+    //     return (indexOfNextSmallest / (double) sampledProbabilities.length);
+    // }
+
+    @Override
+    public double getCredibleLevel(Tree tree) {
+        double logProb = treeDistribution.getLogProbabilityOfTree(tree);
+        if (logProb == Double.NEGATIVE_INFINITY) return -1;
+        int index = findIndexOfNextSmallestLogSpace(logProb) + 1;
+        return index / (double) sampledLogProbabilities.length;
     }
 
     /* Helper method. */
@@ -145,6 +185,23 @@ public class ProbabilityBasedCredibleSetComputer implements ICredibleSet {
         }
 
         // System.out.println("result = " + result);
+        return result;
+    }
+
+    private int findIndexOfNextSmallestLogSpace(double targetLogProb) {
+        int left = 0;
+        int right = sampledLogProbabilities.length - 1;
+        int result = right;
+
+        while (left <= right) {
+            int mid = (left + right) / 2;
+            if (targetLogProb > sampledLogProbabilities[mid]) {
+                result = mid;
+                right = mid - 1;
+            } else {
+                left = mid + 1;
+            }
+        }
         return result;
     }
 
@@ -179,7 +236,6 @@ public class ProbabilityBasedCredibleSetComputer implements ICredibleSet {
                 nums[i] = bucketProbability / meanProbability[i];
             }
         }
-
 
         return nums;
     }

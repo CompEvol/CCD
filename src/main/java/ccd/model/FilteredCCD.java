@@ -362,7 +362,6 @@ public class FilteredCCD extends AbstractCCD {
         }
     }
 
-
     @Override
     public FilteredCCD copy() {
         throw new UnsupportedOperationException("Copying a filtered CCD is by design not supported.");
@@ -371,7 +370,7 @@ public class FilteredCCD extends AbstractCCD {
     @Override
     public void initialize() {
         if (this.rootCCD instanceof CCD0) {
-            CCD0.setPartitionProbabilities(this.rootClade);
+            ((CCD0) rootCCD).setPartitionProbabilities(rootClade);
             this.probabilitiesDirty = false;
         }
     }

@@ -14,7 +14,7 @@ public class OptRegCCD extends RegCCD {
     /**
      * Constructor for an empty CCD. Trees can then be processed one by one.
      *
-     * @param numLeaves      number of leaves of the trees that this CCD will be based on
+     * @param numLeaves number of leaves of the trees that this CCD will be based on
      */
     public OptRegCCD(int numLeaves) {
         super(numLeaves);
@@ -37,9 +37,9 @@ public class OptRegCCD extends RegCCD {
      * Constructor for a {@link OptRegCCD} based on the given collection of trees
      * (not containing any burnin trees).
      *
-     * @param treeSet        an iterable set of trees, which contains no burnin trees,
-     *                       whose distribution is approximated by the resulting
-     *                       {@link OptRegCCD}; all of its trees are used
+     * @param treeSet an iterable set of trees, which contains no burnin trees,
+     *                whose distribution is approximated by the resulting
+     *                {@link OptRegCCD}; all of its trees are used
      */
     public OptRegCCD(TreeAnnotator.TreeSet treeSet) {
         super(treeSet);
@@ -62,7 +62,9 @@ public class OptRegCCD extends RegCCD {
         UnivariateFunction f = RegCCDParameterOptimiser.defineFunction(this, this.baseTrees);
         double threshold = 1e-6;
         double startingPoint;
-        do { startingPoint = Math.random(); } while (startingPoint == 0.0);
+        do {
+            startingPoint = Math.random();
+        } while (startingPoint == 0.0);
         double optiAlpha = RegCCDParameterOptimiser.optimise(f, threshold, threshold, 200, startingPoint);
         return optiAlpha;
     }

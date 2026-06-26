@@ -32,12 +32,23 @@ public class Clade {
      * BitSet representation of this clade. The mapping of bits to taxa is
      * implicit here, explicit in a global context.
      */
-    private final BitSet cladeAsBitSet;
+    private BitSet cladeAsBitSet;
+
+    /**
+     * BitSet representation of this clade, with only the taxa bits, excluding the sampled ancestor flag bit.
+     * The mapping of bits to taxa is implicit here, explicit in a global context.
+     */
+    private BitSet cladeAsBitSetTaxaOnly;
 
     /**
      * Number of taxa in this clade.
      */
-    private final int size;
+    private int size;
+
+    /**
+     * Total number of taxa in the tree this clade belongs to.
+     */
+    private final int numTaxaInTree;
 
     /**
      * The number of times this clade occurs in the processed set of trees.
@@ -52,6 +63,13 @@ public class Clade {
 
     /** Custom parameter associated with this clade. */
     private double parameter = -1;
+
+    /**
+     * Whether this clade was introduced by NNI clade expansion (i.e. it is not
+     * an observed clade). Used by two-level regularisation to give NNI-derived
+     * splits a separate pseudocount.
+     */
+    private boolean nniExpanded = false;
 
     /**
      * Child clades this clade is split into.
@@ -136,7 +154,33 @@ public class Clade {
     public Clade(BitSet cladeInBits, AbstractCCD abstractCCD) {
         this.ccd = abstractCCD;
         this.cladeAsBitSet = cladeInBits;
-        this.size = cladeInBits.cardinality();
+        this.numTaxaInTree = abstractCCD.leafArraySize;
+        this.cladeAsBitSetTaxaOnly = cladeInBits.getSubset(0, numTaxaInTree);
+        this.size = cladeAsBitSetTaxaOnly.cardinality(); // counting #bits set to 1 excluding sampled ancestor bits
+        this.parentClades = new ArrayList<Clade>(4);
+        this.partitions = new ArrayList<CladePartition>(5);
+        this.childClades = new ArrayList<Clade>(8);
+
+        if (size == 1) {
+            this.maxSubtreeLogCCP = 0;
+            this.maxSubtreeSumCladeCredibility = 1;
+            this.probability = 1;
+            this.sumCladeCredibilities = 1;
+        }
+    }
+
+    /**
+     * Construct an empty Clade given a CCD. This clade is represented by an empty BitSet
+     * with placeholders for #taxa = #leaves the trees this CCD is based on.
+     *
+     * @param abstractCCD CCD this clade is part of
+     */
+    public Clade(AbstractCCD abstractCCD) {
+        this.ccd = abstractCCD;
+        this.numTaxaInTree = abstractCCD.leafArraySize;
+        this.cladeAsBitSet = BitSet.newBitSet(numTaxaInTree);
+        this.cladeAsBitSetTaxaOnly = BitSet.newBitSet(numTaxaInTree);
+        this.size = cladeAsBitSetTaxaOnly.cardinality(); // counting #bits set to 1 excluding sampled ancestor bits
         this.parentClades = new ArrayList<Clade>(4);
         this.partitions = new ArrayList<CladePartition>(5);
         this.childClades = new ArrayList<Clade>(8);
@@ -160,6 +204,7 @@ public class Clade {
         Clade copiedClade = new Clade((BitSet) this.cladeAsBitSet.clone(), targetCCD);
         copiedClade.increaseOccurrenceCountBy(getNumberOfOccurrences(), getMeanOccurredHeight());
         copiedClade.setCladeParameter(this.getCladeParameter());
+        copiedClade.setNNIExpanded(this.isNNIExpanded());
         return copiedClade;
     }
 
@@ -286,7 +331,6 @@ public class Clade {
         }
     }
 
-
     /* -- STATE MANAGEMENT -- */
 
     /**
@@ -348,7 +392,6 @@ public class Clade {
      */
     protected void increaseOccurrenceCount(double height) {
         this.meanHeight = (meanHeight * numOccurrences + height) / (numOccurrences + 1);
-
         increaseOccurrenceCount();
     }
 
@@ -432,6 +475,10 @@ public class Clade {
         return cladeAsBitSet;
     }
 
+    public BitSet getCladeInBitsTaxaOnly() {
+        return cladeAsBitSetTaxaOnly;
+    }
+
     /**
      * @return whether this clade represents a leaf
      */
@@ -462,10 +509,11 @@ public class Clade {
 
     @Override
     public String toString() {
-        return "Clade [taxa = " + cladeAsBitSet + ", numOccurrences = " + numOccurrences
-                // + ", ccd = " + ccd
-                + ", num partitions = " + partitions.size()
-                + ", parameter = " + ((parameter < 0) ? getCladeCredibility() : parameter) + "]";
+        return "Clade [taxa = " + cladeAsBitSetTaxaOnly + ", " +
+                ccd.getSampledAncestorInfoString(this) +
+                ", numOccurrences = " + numOccurrences +
+                ", num partitions = " + partitions.size() +
+                ", parameter = " + ((parameter < 0) ? getCladeCredibility() : parameter) + "]";
     }
 
     /**
@@ -582,6 +630,15 @@ public class Clade {
         return this.parameter;
     }
 
+    /** @return whether this clade was introduced by NNI clade expansion */
+    public boolean isNNIExpanded() {
+        return this.nniExpanded;
+    }
+
+    /** @param nniExpanded whether this clade was introduced by NNI clade expansion */
+    public void setNNIExpanded(boolean nniExpanded) {
+        this.nniExpanded = nniExpanded;
+    }
 
     /* -- GETTERS RECURSIVE VALUES -- */
 
@@ -609,11 +666,9 @@ public class Clade {
 
                     runningEntropy -= probability * (logprobability - entropyFirstChild - entropySecondChild);
                 }
-
                 this.entropy = runningEntropy;
             }
         }
-
         return entropy;
     }
 
@@ -711,7 +766,7 @@ public class Clade {
                     BitSet bitsMax = smallCladeMax.getCladeInBits();
                     BitSet bitsCurrent = smallCladeCurrent.getCladeInBits();
 
-                    if (bitsMax.equals(bitsCurrent)) {
+                    if (maxSubtreeCCPPartition.equivalentToPartition(partition)) {
                         System.err.println(maxSubtreeCCPPartition);
                         System.err.println(partition);
                         throw new AssertionError("Tie breaking failed - duplicate partitions detected!");
@@ -880,6 +935,16 @@ public class Clade {
     }
 
     /**
+     * Returns the log probability of this clade appearing in a tree
+     * of a distribution ({@link ITreeDistribution}).
+     *
+     * @return log probability of this clade appearing in a tree
+     */
+    public double getLogProbability() {
+        return Math.log(probability);
+    }
+
+    /**
      * Set the probability of this clade appearing in a tree of its distribution
      * ({@link ITreeDistribution}).
      *
@@ -900,7 +965,7 @@ public class Clade {
      * @return whether this clade contains the given clade as subclade
      */
     public boolean containsClade(Clade potentialSubclade) {
-        return contains(potentialSubclade.getCladeInBits());
+        return contains(potentialSubclade.getCladeInBitsTaxaOnly());
     }
 
     /**
@@ -910,7 +975,7 @@ public class Clade {
      * @return whether this clade contains the given filter
      */
     public boolean contains(BitSet mask) {
-        return BitSetUtil.contains(this.cladeAsBitSet, mask);
+        return BitSetUtil.contains(this.cladeAsBitSetTaxaOnly, mask);
     }
 
     /**
@@ -920,7 +985,7 @@ public class Clade {
      * @return whether this clade is contained in the given BitSet
      */
     public boolean contained(BitSet mask) {
-        return BitSetUtil.contains(mask, this.cladeAsBitSet);
+        return BitSetUtil.contains(mask, this.cladeAsBitSetTaxaOnly);
     }
 
     /**
@@ -930,7 +995,7 @@ public class Clade {
      * @return whether this clade intersects the given clade
      */
     public boolean intersects(Clade potentialIntersectedClade) {
-        return this.intersects(potentialIntersectedClade.getCladeInBits());
+        return this.intersects(potentialIntersectedClade.getCladeInBitsTaxaOnly());
     }
 
     /**
@@ -940,7 +1005,7 @@ public class Clade {
      * @return whether this clade intersects the given filter
      */
     public boolean intersects(BitSet mask) {
-        return this.cladeAsBitSet.intersects(mask);
+        return this.cladeAsBitSetTaxaOnly.intersects(mask);
     }
 
     /**
@@ -953,6 +1018,29 @@ public class Clade {
         return this.cladeAsBitSet.equals(mask);
     }
 
+    public boolean equals(Clade anotherClade) {
+        return this.cladeAsBitSet.equals(anotherClade.cladeAsBitSet);
+    }
+
+    /**
+     * Returns whether this clade contains the same taxa as the given clade.
+     *
+     * @param anotherClade to be tested if contains the same taxa as this clade
+     * @return whether this clade contains the same taxa as the given clade
+     */
+    public boolean hasSameTaxa(Clade anotherClade) {
+        return this.cladeAsBitSetTaxaOnly.equals(anotherClade.cladeAsBitSetTaxaOnly);
+    }
+
+    /**
+     * Returns whether this clade contains the same taxa as the given BitSet.
+     *
+     * @param mask to be tested if contains the same taxa as this clade
+     * @return whether this clade contains the same taxa as the given filter
+     */
+    public boolean hasSameTaxa(BitSet mask) {
+        return this.cladeAsBitSetTaxaOnly.equals(mask);
+    }
 
     /* -- BASE CLADE FOR FILTERED CCDs -- */
 

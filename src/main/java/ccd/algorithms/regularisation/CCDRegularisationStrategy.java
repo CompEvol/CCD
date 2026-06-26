@@ -3,6 +3,7 @@ package ccd.algorithms.regularisation;
 public enum CCDRegularisationStrategy {
     AdditiveOne("Additive-1"),
     AdditiveX("Additive-"),
+    AdditiveXY("Additive-XY"),
     PriorOne("Prior-1"),
     PriorScaled("Prior-Scaled");
 

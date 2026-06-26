@@ -6,14 +6,15 @@ import ccd.algorithms.TreeDistances;
 import ccd.model.bitsets.BitSet;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class WrappedBeastTree {
 
     private int count = 1;
 
-    private Tree wrappedTree;
+    protected Tree wrappedTree;
 
-    private BitSet[] cladeOfVertex;
+    protected BitSet[] cladeOfVertex;
 
     /** Matrix containing distances (#edges) between pairs of leaves. */
     private double[][] pathDistanceMatrix;
@@ -29,7 +30,7 @@ public class WrappedBeastTree {
         return wrappedTree;
     }
 
-    private BitSet initCladeBitSet(Node vertex) {
+    protected BitSet initCladeBitSet(Node vertex) {
         BitSet cladeAsBitSet = BitSet.newBitSet(wrappedTree.getLeafNodeCount());
         if (vertex.isLeaf()) {
             cladeAsBitSet.set(vertex.getNr());
@@ -39,7 +40,6 @@ public class WrappedBeastTree {
                 cladeAsBitSet.or(childBitSet);
             }
         }
-
         cladeOfVertex[vertex.getNr()] = cladeAsBitSet;
         return cladeAsBitSet;
     }
@@ -107,6 +107,9 @@ public class WrappedBeastTree {
         return false;
     }
 
+    /**
+     * @return A list of clades bitSet, excluding leaves, including root
+     */
     public ArrayList<BitSet> getNontrivialClades() {
         ArrayList<BitSet> clades = new ArrayList<>();
         for (int i = wrappedTree.getLeafNodeCount(); i < wrappedTree.getNodeCount(); i++) {

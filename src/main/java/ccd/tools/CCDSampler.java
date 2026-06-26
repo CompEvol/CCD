@@ -11,11 +11,13 @@ import beastfx.app.util.TreeFile;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
+import java.util.List;
 import java.util.Random;
 
 import ccd.model.AbstractCCD;
 import ccd.model.CCDType;
 import ccd.model.HeightSettingStrategy;
+import ccd.model.KRegCCD;
 
 @Description("Allows to sample from a CCD{0,1} based on a input set of trees")
 public class CCDSampler extends Runnable {
@@ -25,6 +27,8 @@ public class CCDSampler extends Runnable {
     final public Input<CCDType> ccdTypeInput = new Input<>("ccdType", "type of CCD, e.g. CCD0 or CCD1", CCDType.CCD0, CCDType.values());
     final public Input<Integer> sampleSizeInput = new Input<>("length", "number of trees sampled from CCD", 1000);
     final public Input<Long> seedInput = new Input<>("seed", "seed for random for chain generation");
+    final public Input<Boolean> optimiseInput = new Input<>("optimise", "for ccdType KRegCCD only: select (alpha, mu) by cross-validated held-out tree probability instead of the defaults", false);
+    final public Input<Integer> foldsInput = new Input<>("folds", "number of cross-validation folds when optimise=true", 5);
 
     @Override
     public void initAndValidate() {
@@ -42,7 +46,16 @@ public class CCDSampler extends Runnable {
         Log.info.println("    output file: " + outputInput.get());
 
         TreeAnnotator.MemoryFriendlyTreeSet treeSet = CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
-        AbstractCCD ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput.get());
+        AbstractCCD ccd;
+        if (ccdTypeInput.get() == CCDType.KRegCCD && optimiseInput.get()) {
+            List<Tree> trees = CCDToolUtil.treesFromSet(treeSet);
+            Log.info.println("    selecting KRegCCD (alpha, mu) by " + foldsInput.get()
+                    + "-fold held-out cross-validation...");
+            ccd = KRegCCD.withOptimisedParameters(trees, foldsInput.get());
+            Log.info.println("    " + ccd);
+        } else {
+            ccd = CCDToolUtil.getCCDTypeByName(treeSet, ccdTypeInput.get());
+        }
 
         long seed = (seedInput.get() != null) ? seedInput.get() : System.currentTimeMillis();
         ccd.setRandom(new Random(seed));

@@ -78,7 +78,7 @@ public abstract class CladeBasedCredibleCCDComputer extends CredibleCCDComputer 
             // recompute values in partial CCD
             // if (partialCCD instanceof CCD0) {
             partialCCD.resetSumCladeCredibilities();
-            CCD0.setPartitionProbabilities(rootClade);
+            ((CCD0) partialCCD).setPartitionProbabilities(rootClade);
             partialCCD.computeCladeProbabilities();
             // }
 
