@@ -417,6 +417,205 @@ public class KRegCCD extends RegCCD {
     }
 
     /**
+     * Buffer-reusing variant of {@link #getLogProbabilityOfTree(Tree)} for repeated scoring (e.g. an SPR
+     * operator scoring every re-attachment of a pruned subtree): the caller supplies a scratch map whose
+     * per-node {@link BitSet}s are CLEARED and reused rather than reallocated, removing the per-call
+     * {@code HashMap} and per-node {@code BitSet} allocation that dominates such loops. Entries for nodes not in
+     * {@code tree} are harmless (only nodes reachable from the root are written and read). Returns exactly the
+     * same value as {@link #getLogProbabilityOfTree(Tree)}.
+     */
+    public double getLogProbabilityOfTree(Tree tree, Map<Node, BitSet> scratch) {
+        computeBitsReusing(tree.getRoot(), scratch);
+        double[] logp = new double[]{0.0};
+        scoreFresh(tree.getRoot(), scratch, logp, mu, true);
+        return logp[0];
+    }
+
+    /** As {@link #computeBits} but reuses each node's {@link BitSet} from {@code bits} (clear + recompute)
+     *  instead of allocating a fresh one, so repeated calls on stable node objects do not allocate. */
+    private BitSet computeBitsReusing(Node v, Map<Node, BitSet> bits) {
+        BitSet b = bits.get(v);
+        if (b == null) {
+            b = BitSet.newBitSet(leafArraySize);
+            bits.put(v, b);
+        } else {
+            b.clear();
+        }
+        if (v.isLeaf()) {
+            b.set(v.getNr());
+        } else {
+            b.or(computeBitsReusing(v.getChildren().get(0), bits));
+            b.or(computeBitsReusing(v.getChildren().get(1), bits));
+        }
+        return b;
+    }
+
+    /**
+     * Incrementally score EVERY single-leaf re-graft of leaf {@code leafIndex} onto {@code reduced} (a tree that
+     * does NOT contain that leaf): for each target node {@code x}, the full-support log-probability of the tree
+     * obtained by attaching the leaf on the branch above {@code x}. This is the engine for a CCD-guided SPR/Gibbs
+     * operator that must score all {@code ~2n} re-attachments per move; scoring each independently with
+     * {@link #getLogProbabilityOfTree(Tree)} is {@code O(n)} each ({@code O(n^2)} total), dominated by re-walking
+     * the unchanged backbone. Here the backbone is priced ONCE: {@code subScore[v]} = the self-contained
+     * full-support score of {@code v}'s subtree, then each re-graft is a MEMOISED {@code scoreFresh} that returns
+     * the cached {@code subScore} for any subtree not containing the leaf, so the recursion only descends the
+     * leaf's insertion path. Result is identical to {@link #getLogProbabilityOfTree(Tree)} of the spliced tree.
+     *
+     * @param reduced   a tree on the taxon set MINUS the leaf (leaves carry this CCD's canonical numbering)
+     * @param leafIndex the canonical index of the leaf being re-grafted
+     * @param targets   the nodes above which to score an attachment (must exclude the root); {@code null} = all
+     *                  non-root nodes
+     * @return map from each target node to the log-probability of attaching the leaf above it
+     */
+    public Map<Node, Double> logProbabilityOfAllRegrafts(Tree reduced, int leafIndex, List<Node> targets) {
+        Map<Node, BitSet> bits = new HashMap<>();
+        computeBits(reduced.getRoot(), bits);
+
+        // price the backbone once: self-contained subtree score for every node (only OBSERVED-clade nodes are ever
+        // read back, but the post-order recurses through novel-clade interiors to reach their observed boundaries)
+        Map<Node, Double> subScore = new HashMap<>();
+        computeSubtreeScores(reduced.getRoot(), bits, subScore);
+
+        // spare nodes spliced in to form each candidate tree (reused across candidates)
+        BitSet iBits = BitSet.newBitSet(leafArraySize);
+        iBits.set(leafIndex);
+        Node iLeaf = new Node();
+        iLeaf.setNr(leafIndex);
+        bits.put(iLeaf, iBits);
+        Node p = new Node();
+
+        List<Node> tgts = targets;
+        if (tgts == null) {
+            tgts = new ArrayList<>();
+            collectNonRoot(reduced.getRoot(), reduced.getRoot(), tgts);   // getNodesAsArray() may be uninitialised
+        }
+        Map<Node, Double> out = new HashMap<>(tgts.size() * 2);
+        for (Node x : tgts) {
+            out.put(x, scoreOneRegraft(reduced.getRoot(), x, leafIndex, iBits, iLeaf, p, bits, subScore));
+        }
+        return out;
+    }
+
+    /** Score the single tree formed by attaching the leaf above {@code x}: splice {@code p=(leaf, x)} into x's
+     *  edge, override the bits of {@code p} and the path {@code x.parent..root} to carry the leaf, run the
+     *  memoised scoreFresh, then restore everything (so {@code bits}/the tree are unchanged for the next target). */
+    private double scoreOneRegraft(Node root, Node x, int leafIndex, BitSet iBits, Node iLeaf, Node p,
+                                   Map<Node, BitSet> bits, Map<Node, Double> subScore) {
+        Node xp = x.getParent();
+        xp.removeChild(x);
+        xp.addChild(p);
+        p.addChild(iLeaf);
+        p.addChild(x);
+        BitSet pBits = (BitSet) bits.get(x).clone();
+        pBits.or(iBits);
+        bits.put(p, pBits);
+        List<Node> pathNodes = new ArrayList<>();
+        List<BitSet> pathSaved = new ArrayList<>();
+        for (Node a = xp; a != null; a = a.getParent()) {
+            pathNodes.add(a);
+            pathSaved.add(bits.get(a));
+            BitSet ab = (BitSet) bits.get(a).clone();
+            ab.or(iBits);
+            bits.put(a, ab);
+        }
+        double[] logp = {0.0};
+        scoreFreshMemo(root, bits, logp, leafIndex, subScore);
+        for (int q = 0; q < pathNodes.size(); q++) bits.put(pathNodes.get(q), pathSaved.get(q));
+        bits.remove(p);
+        xp.removeChild(p);
+        p.removeChild(iLeaf);
+        p.removeChild(x);
+        xp.addChild(x);
+        return logp[0];
+    }
+
+    /** {@code subScore[v]} = self-contained full-support score of v's subtree, computed bottom-up (mirrors a
+     *  standalone {@link #scoreFresh} of v). Only OBSERVED-clade nodes' values are ever read; novel-clade nodes get
+     *  0 (they only ever appear as region interior, never as a memoised recursion root). */
+    private double computeSubtreeScores(Node v, Map<Node, BitSet> bits, Map<Node, Double> subScore) {
+        if (v.isLeaf()) {
+            subScore.put(v, 0.0);
+            return 0.0;
+        }
+        Node c1 = v.getChildren().get(0), c2 = v.getChildren().get(1);
+        computeSubtreeScores(c1, bits, subScore);
+        computeSubtreeScores(c2, bits, subScore);
+        BitSet vb = bits.get(v), c1b = bits.get(c1), c2b = bits.get(c2);
+        double s;
+        if (isRed(vb, c1b, c2b)) {
+            Clade c = getClade(vb);
+            CladeReg reg = computeReg(c);
+            s = (reg.reservable() ? Math.log(1.0 - mu - reg.tail()) : 0.0)
+                    + rawLogCCP(c, c1b, c2b) + subScore.get(c1) + subScore.get(c2);
+        } else if (getClade(vb) != null) {
+            // observed clade, novel split: standalone region top
+            List<Node> boundary = new ArrayList<>();
+            collectRegion(v, bits, boundary);
+            s = regionScore(vb, getClade(vb), boundary.size(), boundary, bits);
+            for (Node b : boundary) s += subScore.get(b);
+        } else {
+            s = 0.0;   // novel clade: never read back
+        }
+        subScore.put(v, s);
+        return s;
+    }
+
+    /** Memoised {@link #scoreFresh}: identical pricing, but recursion into a subtree NOT containing the re-grafted
+     *  leaf returns the cached {@code subScore} instead of descending. Only ever entered on observed-clade nodes. */
+    private void scoreFreshMemo(Node v, Map<Node, BitSet> bits, double[] logp, int leafIndex,
+                                Map<Node, Double> subScore) {
+        if (v.isLeaf()) {
+            return;
+        }
+        Node c1 = v.getChildren().get(0), c2 = v.getChildren().get(1);
+        BitSet vb = bits.get(v), c1b = bits.get(c1), c2b = bits.get(c2);
+        if (isRed(vb, c1b, c2b)) {
+            Clade c = getClade(vb);
+            CladeReg reg = computeReg(c);
+            if (reg.reservable()) {
+                logp[0] += Math.log(1.0 - mu - reg.tail());
+            }
+            logp[0] += rawLogCCP(c, c1b, c2b);
+            memoRecurse(c1, bits, logp, leafIndex, subScore);
+            memoRecurse(c2, bits, logp, leafIndex, subScore);
+        } else {
+            List<Node> boundary = new ArrayList<>();
+            collectRegion(v, bits, boundary);
+            logp[0] += regionScore(vb, getClade(vb), boundary.size(), boundary, bits);
+            for (Node b : boundary) {
+                memoRecurse(b, bits, logp, leafIndex, subScore);
+            }
+        }
+    }
+
+    private void collectNonRoot(Node v, Node root, List<Node> out) {
+        if (v != root) out.add(v);
+        for (Node c : v.getChildren()) collectNonRoot(c, root, out);
+    }
+
+    private void memoRecurse(Node child, Map<Node, BitSet> bits, double[] logp, int leafIndex,
+                             Map<Node, Double> subScore) {
+        if (bits.get(child).get(leafIndex)) {
+            scoreFreshMemo(child, bits, logp, leafIndex, subScore);
+        } else {
+            logp[0] += subScore.get(child);
+        }
+    }
+
+    /** The blue-region contribution {@code (m - 2) * logEps(top) - logPath} (fallback {@code log(mu) - logPath}),
+     *  exactly as {@link #scoreFresh}'s else-branch (useStoredReg path). */
+    private double regionScore(BitSet vb, Clade top, int m, List<Node> boundary, Map<Node, BitSet> bits) {
+        double logPath = 0.0;
+        if (novelMode != NovelMode.FLAT) {
+            BitSet[] parts = new BitSet[m];
+            for (int i = 0; i < m; i++) parts[i] = bits.get(boundary.get(i));
+            logPath = Math.log(countAllNovelResolutions(vb, parts));
+        }
+        double logEps = computeReg(top).logEps();
+        return (logEps == Double.NEGATIVE_INFINITY) ? Math.log(mu) - logPath : (m - EXP_REDUCTION) * logEps - logPath;
+    }
+
+    /**
      * Probability of the given tree under the full-support model, {@code exp(getLogProbabilityOfTree)}.
      *
      * <p>Overrides {@link AbstractCCD#getProbabilityOfTree}, whose red-only CCP product is wrong here:
