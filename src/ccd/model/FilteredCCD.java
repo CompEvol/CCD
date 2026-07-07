@@ -371,7 +371,13 @@ public class FilteredCCD extends AbstractCCD {
     @Override
     public void initialize() {
         if (this.rootCCD instanceof CCD0) {
-            CCD0.setPartitionProbabilities(this.rootClade);
+            try {
+                CCD0.setPartitionProbabilities(this.rootClade);
+            } catch (UnderflowException e) {
+                // log a warning here will spam the screen...
+                this.rootCCD.resetSumCladeCredibilities();
+                CCD0.setPartitionLogProbabilities(this.rootClade);
+            }
             this.probabilitiesDirty = false;
         }
     }

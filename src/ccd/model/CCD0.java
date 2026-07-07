@@ -735,7 +735,7 @@ public class CCD0 extends AbstractCCD {
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility
      */
-    private static double setPartitionLogProbabilities(Clade clade) {
+    public static double setPartitionLogProbabilities(Clade clade) {
         if (clade.getLogSumCladeCredibilities() < 0) {
             return clade.getLogSumCladeCredibilities();
         }
