@@ -1,12 +1,11 @@
 package ccd.algorithms;
 
+import beast.base.evolution.tree.Node;
 import ccd.model.WrappedBeastTree;
+import ccd.model.WrappedBeastTreeWithSampledAncestor;
 import ccd.model.bitsets.BitSet;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.PriorityQueue;
+import java.util.*;
 
 /**
  * This class provides distance computation methods for two beast trees.
@@ -25,10 +24,157 @@ public class TreeDistances {
      * @return the RF distance (divided by 2) for the two given trees
      */
     public static int robinsonsFouldDistance(WrappedBeastTree first, WrappedBeastTree second) {
+        // if input trees are of type WrappedBeastTreeWithSampledAncestor,
+        // clades with the same taxa but different SA info would be identified as different clades,
+        // therefore increase the distance
         ArrayList<BitSet> firstClades = first.getNontrivialClades();
         ArrayList<BitSet> secondClades = second.getNontrivialClades();
         firstClades.removeAll(secondClades);
         return firstClades.size();
+    }
+
+    /**
+     * Symmetric difference of the two trees' sampled-ancestor leaf sets:
+     * {@code |SA(first) △ SA(second)|}. This counts only SA-status
+     * disagreements per leaf and ignores topology entirely; two trees with
+     * completely different topologies but identical SA sets get distance 0.
+     *
+     * <p>This is <em>not</em> the sampled-ancestor Robinson-Foulds distance;
+     * it is one of its two components (the asymmetric singleton penalty).
+     * For the full SA-RF metric that combines topology and SA-status
+     * differences, see
+     * {@link #sampledAncestorRobinsonFoulds(WrappedBeastTreeWithSampledAncestor, WrappedBeastTreeWithSampledAncestor)}.
+     */
+    public static int sampledAncestorSymmetricDistance(WrappedBeastTreeWithSampledAncestor first, WrappedBeastTreeWithSampledAncestor second) {
+        ArrayList<Node> firstTreeSANodes = new ArrayList<>(first.getSampledAncestors());
+        ArrayList<Node> secondTreeSANodes = new ArrayList<>(second.getSampledAncestors());
+
+        ArrayList<Node> onlyFirst = new ArrayList<>(firstTreeSANodes);
+        onlyFirst.removeAll(secondTreeSANodes);
+
+        ArrayList<Node> onlySecond = new ArrayList<>(secondTreeSANodes);
+        onlySecond.removeAll(firstTreeSANodes);
+
+        return onlyFirst.size() + onlySecond.size();
+    }
+
+    /**
+     * Sampled-ancestor Robinson-Foulds distance between two SA trees on the
+     * same taxa. The "cuttable" clade set of a tree {@code T = (tau, sigma)}
+     * is
+     * <pre>
+     *   C_cut(T) = { C(v) : v internal in tau } u { {i} : sigma_i = 0 }
+     * </pre>
+     * the taxa-only internal-node clades, plus singleton clades for the
+     * non-SA leaves only (an SA leaf has a zero-length parent branch and
+     * cannot be separated from its parent's clade by an edge cut, so no
+     * {@code {i}} singleton is contributed). The distance is the size of
+     * the symmetric difference,
+     * <pre>
+     *   d_SA-RF(T, T') = |C_cut(T) △ C_cut(T')|.
+     * </pre>
+     *
+     * <p>Properties:
+     * <ul>
+     *   <li>Reduces to standard rooted RF (full symmetric difference) when
+     *       neither tree contains SAs.
+     *   <li>Asymmetric singleton penalty: leaf {@code i} being SA in only
+     *       one tree contributes 1 (not 2) to the distance, since the SA
+     *       tree contributes no {@code {i}} clade.
+     *   <li>Symmetric and non-negative; zero iff the two trees have the
+     *       same internal clades and the same SA pattern.
+     * </ul>
+     *
+     * <p>This method returns the full symmetric-difference cardinality,
+     * unlike {@link #robinsonsFouldDistance(WrappedBeastTree, WrappedBeastTree)}
+     * which returns the halved count and relies on the binary-tree symmetry
+     * {@code |T \\ T'| = |T' \\ T|} that the asymmetric singleton penalty
+     * here breaks.
+     */
+    public static int sampledAncestorRobinsonFoulds(WrappedBeastTreeWithSampledAncestor first,
+                                                    WrappedBeastTreeWithSampledAncestor second) {
+        int n = first.getWrappedTree().getLeafNodeCount();
+        if (second.getWrappedTree().getLeafNodeCount() != n) {
+            throw new IllegalArgumentException(
+                    "SA-RF requires both trees to have the same number of taxa; got "
+                            + n + " and " + second.getWrappedTree().getLeafNodeCount());
+        }
+
+        Set<BitSet> cuttableFirst = cuttableCladeSet(first, n);
+        Set<BitSet> cuttableSecond = cuttableCladeSet(second, n);
+
+        int onlyFirst = 0;
+        for (BitSet c : cuttableFirst) if (!cuttableSecond.contains(c)) onlyFirst++;
+        int onlySecond = 0;
+        for (BitSet c : cuttableSecond) if (!cuttableFirst.contains(c)) onlySecond++;
+
+        return onlyFirst + onlySecond;
+    }
+
+    /**
+     * Pure topology Robinson-Foulds distance on SA trees: counts internal-node
+     * clades (taxa-only, ignoring SA flags) that appear in {@code first} but
+     * not {@code second}.
+     *
+     * <p>Useful as a complement to
+     * {@link #robinsonsFouldDistance(WrappedBeastTree, WrappedBeastTree)} when
+     * called on {@link WrappedBeastTreeWithSampledAncestor} instances: that
+     * method uses the wide bitsets ({@code [0,n)} taxa, {@code [n,2n)} SA
+     * flags) so two trees with the same taxa-only clades but different
+     * direct-SA-leaf-children patterns at a clade are counted as differing.
+     * This method strips the SA flags and considers only base topology.
+     *
+     * <p>Follows the halved convention of
+     * {@link #robinsonsFouldDistance(WrappedBeastTree, WrappedBeastTree)}: for
+     * binary trees on the same taxa,
+     * {@code |topology(T1) \\ topology(T2)| = |topology(T2) \\ topology(T1)|},
+     * so this is half the symmetric difference.
+     */
+    public static int topologyRobinsonFoulds(WrappedBeastTreeWithSampledAncestor first,
+                                             WrappedBeastTreeWithSampledAncestor second) {
+        int n = first.getWrappedTree().getLeafNodeCount();
+        if (second.getWrappedTree().getLeafNodeCount() != n) {
+            throw new IllegalArgumentException(
+                    "topologyRF requires both trees to have the same number of taxa; got "
+                            + n + " and " + second.getWrappedTree().getLeafNodeCount());
+        }
+        Set<BitSet> firstClades = internalCladesTaxaOnly(first, n);
+        Set<BitSet> secondClades = internalCladesTaxaOnly(second, n);
+        int onlyFirst = 0;
+        for (BitSet c : firstClades) if (!secondClades.contains(c)) onlyFirst++;
+        return onlyFirst;
+    }
+
+    private static Set<BitSet> cuttableCladeSet(WrappedBeastTreeWithSampledAncestor t, int n) {
+        Set<BitSet> set = internalCladesTaxaOnly(t, n);
+        for (Node leaf : t.getWrappedTree().getExternalNodes()) {
+            if (leaf.getLength() != 0.0) {
+                BitSet singleton = BitSet.newBitSet(n);
+                singleton.set(leaf.getNr());
+                set.add(singleton);
+            }
+        }
+        return set;
+    }
+
+    private static Set<BitSet> internalCladesTaxaOnly(WrappedBeastTreeWithSampledAncestor t, int n) {
+        Set<BitSet> set = new HashSet<>();
+        collectInternalCladesTaxaOnly(t.getWrappedTree().getRoot(), n, set);
+        return set;
+    }
+
+    private static BitSet collectInternalCladesTaxaOnly(Node v, int n, Set<BitSet> internalClades) {
+        if (v.isLeaf()) {
+            BitSet leafBits = BitSet.newBitSet(n);
+            leafBits.set(v.getNr());
+            return leafBits;
+        }
+        BitSet cladeBits = BitSet.newBitSet(n);
+        for (Node child : v.getChildren()) {
+            cladeBits.or(collectInternalCladesTaxaOnly(child, n, internalClades));
+        }
+        internalClades.add(cladeBits);
+        return cladeBits;
     }
 
     /**

@@ -107,6 +107,29 @@ public class BitSet128 extends BitSet {
     }
 
     /**
+     * Returns the subset of the bitSet with specified from (inclusive) and to (exclusive) indices.
+     *
+     * @param fromBitIndex the starting (inclusive) bit index
+     * @param toBitIndex the ending (exclusive) bit index
+     * @return the subset of the bitSet given specified from (inclusive) and to (exclusive) indices
+     * @throws IndexOutOfBoundsException if the starting index is negative or the ending index < the starting index
+     */
+    public BitSet128 getSubset(int fromBitIndex, int toBitIndex) {
+        if (fromBitIndex < 0)
+            throw new IndexOutOfBoundsException("fromBitIndex < 0: " + fromBitIndex);
+        if (toBitIndex < fromBitIndex)
+            throw new IndexOutOfBoundsException("toBitIndex < fromBitIndex");
+
+        BitSet128 subset = new BitSet128();
+        for (int i = fromBitIndex; i < toBitIndex; i++) {
+            if (this.get(i)) {
+                subset.set(i - fromBitIndex);
+            }
+        }
+        return subset;
+    }
+
+    /**
      * Performs a logical <b>OR</b> of this bit set with the bit set
      * argument. This bit set is modified so that a bit in it has the
      * value {@code true} if and only if it either already had the

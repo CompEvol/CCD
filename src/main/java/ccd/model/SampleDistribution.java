@@ -290,6 +290,26 @@ public class SampleDistribution implements ITreeDistribution {
     }
 
     @Override
+    public double sampleTreeLogProbability() {
+        this.tidyUpIfDirty();
+
+        int pick = this.getRandom().nextInt(numBaseTrees);
+        int next = 0;
+
+        for (WrappedBeastTree tree : trees) {
+            next += tree.getCount();
+
+            if (pick <= next) {
+                double p = tree.getCount() / (double) this.numBaseTrees;
+                return Math.log(p);
+            }
+        }
+
+        System.err.println("No tree probability sampled. Suspect number of tree counts does not add up to number of base trees.");
+        return Double.NEGATIVE_INFINITY;
+    }
+
+    @Override
     public int getNumberOfLeaves() {
         return numLeaves;
     }
@@ -408,6 +428,12 @@ public class SampleDistribution implements ITreeDistribution {
             }
         }
         return 0;
+    }
+
+    @Override
+    public double getLogProbabilityOfTree(Tree tree) {
+        double p = getProbabilityOfTree(tree);
+        return Math.log(p);
     }
 
     @Override
@@ -561,7 +587,6 @@ public class SampleDistribution implements ITreeDistribution {
             System.out.println("parent = " + vertex);
             System.out.println("childR = " + vertex.getRight());
         }
-
 
         leftBits.or(rightBits);
         return leftBits;

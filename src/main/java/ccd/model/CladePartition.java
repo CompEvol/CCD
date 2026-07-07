@@ -255,7 +255,6 @@ public class CladePartition {
                 && this.containsChildClade(otherPartition.getChildClades()[1]);
     }
 
-
     /* -- GETTERS RECURSIVE VALUES -- */
 
     /** @return the number of tree topologies with this partition at the root */
@@ -321,10 +320,12 @@ public class CladePartition {
         }
     }
 
-    /* Precompute log values for quick lookup */
-    private static double[] logTable;
+    /* Precompute log values for quick lookup. Volatile so that a table grown by one thread (see
+     * growLogTable) is safely published to readers -- the table is shared across all CladePartition
+     * instances and may be read concurrently when CCDs are built/sampled in parallel. */
+    private static volatile double[] logTable;
 
-    private static int logTableLength = 1024;
+    private static final int logTableLength = 1024;
 
     static {
         logTable = new double[logTableLength];
@@ -347,20 +348,34 @@ public class CladePartition {
                         - logTable[this.getParentClade().getNumberOfOccurrences()];
                 return logCCP;
             } catch (ArrayIndexOutOfBoundsException e) {
-                // if our table of log wasn't long enough
-                int oldLength = logTable.length;
-                double[] tmp = new double[oldLength + logTableLength];
-                System.arraycopy(logTable, 0, tmp, 0, oldLength);
-                for (int i = oldLength; i < tmp.length; i++) {
-                    tmp[i] = Math.log(i);
-                }
-                logTable = tmp;
-
+                // if our table of log wasn't long enough, grow it (thread-safely) and retry
+                growLogTable(Math.max(this.numOccurrences, this.getParentClade().getNumberOfOccurrences()));
                 return getLogCCP();
             }
         } else {
             return Math.log(this.ccp);
         }
+    }
+
+    /**
+     * Grows the shared log lookup table so index {@code minIndex} is valid, then publishes it. Every
+     * entry is {@code log(i)}, so concurrent growers compute identical values; the synchronized block
+     * with a re-check just avoids redundant work and the unsafe publication of a half-filled array.
+     */
+    private static synchronized void growLogTable(int minIndex) {
+        if (minIndex < logTable.length) {
+            return; // another thread already grew it past minIndex
+        }
+        int newLength = logTable.length;
+        while (minIndex >= newLength) {
+            newLength += logTableLength;
+        }
+        double[] tmp = new double[newLength];
+        System.arraycopy(logTable, 0, tmp, 0, logTable.length);
+        for (int i = logTable.length; i < tmp.length; i++) {
+            tmp[i] = Math.log(i);
+        }
+        logTable = tmp;
     }
 
     /**
@@ -436,7 +451,6 @@ public class CladePartition {
                 maxSubtreeLogCCP += clade.getMaxSubtreeLogCCP();
             }
         }
-
         return maxSubtreeLogCCP;
     }
 
