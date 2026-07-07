@@ -47,7 +47,7 @@ public class CCD0 extends AbstractCCD {
     public static final boolean USE_CLADE_PARAMETERS = true;
 
     /** Whether expand should use the monophyletic clade speedup. */
-    private boolean useMonophyleticCladeSpeedup = false;
+    protected boolean useMonophyleticCladeSpeedup = false;
 
     /** Whether expand should run update online (instead of from scratch). */
     private boolean updateOnline = false;
@@ -62,7 +62,7 @@ public class CCD0 extends AbstractCCD {
     private List<Clade> newClades = null;
 
     /** Clades organized by size for more efficient expand method. */
-    private List<List<Clade>> cladeBuckets = null;
+    protected List<List<Clade>> cladeBuckets = null;
 
     /**
      * from[i][j] is the first clade in cladeBuckets[i] that has bit j set.
@@ -73,10 +73,10 @@ public class CCD0 extends AbstractCCD {
      * All others have at least one taxon outside C: the clades below from[i][]
      * have a taxon below any taxon in C and the clades above to[i][] have one above.
      */
-    private int[][] from, to;
+    protected int[][] from, to;
 
     /** Clades already processed */
-    private Set<Clade> done;
+    protected Set<Clade> done;
 
     /** Stream to report on progress of CCD0 construction. */
     private PrintStream progressStream = System.out;
@@ -96,7 +96,7 @@ public class CCD0 extends AbstractCCD {
     public static final int NUM_CLADES_PARALLELIZATION_THRESHOLD = 20000;
 
     /** Number of worker threads used for the expand step. */
-    private int threadCount = 1;
+    protected int threadCount = 1;
     private CountDownLatch countDown = null;
 
 
@@ -397,7 +397,7 @@ public class CCD0 extends AbstractCCD {
 
         // 3. clade buckets
         // for easier matching of child clades, we want to group them by size
-        cladeBuckets = processCladeBuckets(clades, leafArraySize);
+        cladeBuckets = processCladeBuckets(clades);
 
         // 4. find missing clade partitions
         done = new HashSet<>();
@@ -439,18 +439,16 @@ public class CCD0 extends AbstractCCD {
         // System.err.println("Expanded in " + (end-start) + " ms");
     }
 
-
     /**
      * set up clade buckets so that
      * 1. each bucket contains clades of the same size
      * 2. clades are sorted by first set bit, then last set bit
      * 3. as a side effect, the from[][] and to[][] arrays are initialised
      *
-     * @param clades        set of clades to distribute into clade buckets
-     * @param leafArraySize = maximum clade size
+     * @param clades set of clades to distribute into clade buckets
      * @return clade buckets
      */
-    private List<List<Clade>> processCladeBuckets(List<Clade> clades, int leafArraySize) {
+    protected List<List<Clade>> processCladeBuckets(List<Clade> clades) {
         List<List<Clade>> cladeBuckets = new ArrayList<>(leafArraySize);
 
         // 3.i init clade buckets
@@ -496,9 +494,9 @@ public class CCD0 extends AbstractCCD {
                         fromi[j++] = c;
                     }
                     int max = clade.getCladeInBits().lastSetBit();
-//	        		if (max < 0 || max >= toi.length) {
-//	        			max = clade.getCladeInBits().lastSetBit();
-//	        		}
+                    //	        		if (max < 0 || max >= toi.length) {
+                    //	        			max = clade.getCladeInBits().lastSetBit();
+                    //	        		}
                     toi[max] = c;
                 }
                 while (j < leafArraySize) {
@@ -580,7 +578,7 @@ public class CCD0 extends AbstractCCD {
     }
 
     /* Helper method - do the work for one particular clade */
-    private void findChildPartitionsOf(Clade parent, BitSet helperBits) {
+    protected void findChildPartitionsOf(Clade parent, BitSet helperBits) {
         // we skip leaves and cherries as they have no/only one partition
         if (parent.isLeaf() || parent.isCherry()) {
             return;
@@ -666,7 +664,7 @@ public class CCD0 extends AbstractCCD {
     }
 
     /* Helper method */
-    private void findPartitionHelper(Clade child, Clade parent, BitSet helperBits, BitSet parentBits, BitSet childBits) {
+    protected void findPartitionHelper(Clade child, Clade parent, BitSet helperBits, BitSet parentBits, BitSet childBits) {
         // check whether child clade is contained in parent clade
         helperBits.clear();
         helperBits.or(parentBits);
@@ -730,7 +728,7 @@ public class CCD0 extends AbstractCCD {
     /**
      * Recursively computes, sets, and returns the log probabilities of all clade partitions based on the clade credibilities.
      * Method only needs to be called when a CCD0 was constructed manually,
-     * e.g. by the {@link  ccp.algorithms.CCDCombiner}.
+     * e.g. by the {@link  ccd.algorithms.CCDCombiner}.
      *
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility
@@ -811,7 +809,7 @@ public class CCD0 extends AbstractCCD {
      * @param clade for which the clade partition probabilities are computed
      * @return the sum of this clade's partitions probabilities times its own credibility
      */
-    public static void setPartitionProbabilities(Clade clade) {
+    public void setPartitionProbabilities(Clade clade) {
         setPartitionProbabilities(clade, !USE_CLADE_PARAMETERS);
     }
 
@@ -824,7 +822,7 @@ public class CCD0 extends AbstractCCD {
      * @param useCladeParameters whether to use the clade parameters or the clade credibilities
      * @return the sum of this clade's partitions probabilities times its own credibility
      */
-    public static double setPartitionProbabilities(Clade clade, boolean useCladeParameters) {
+    public double setPartitionProbabilities(Clade clade, boolean useCladeParameters) {
         if (clade.getSumCladeCredibilities() > 0) {
             return clade.getSumCladeCredibilities();
         }
@@ -886,14 +884,14 @@ public class CCD0 extends AbstractCCD {
                     i++;
                 }
 
-                // log sum = log pMax - log( sum exp(log pi - logMax))
+                // log(Σ exp(xᵢ)) = max + log(Σ exp(xᵢ - max))
                 double intermSum = 0;
                 for (int j = 0; j < logProbs.length; j++) {
                     if (Double.isFinite(logProbs[j])) {
                         intermSum += Math.exp(logProbs[j] - logMax);
                     }
                 }
-                double logSum = logMax - Math.log(intermSum);
+                double logSum = logMax + Math.log(intermSum);
 
                 // normalizing with normalized log pi = log pi - log sum
                 i = 0;

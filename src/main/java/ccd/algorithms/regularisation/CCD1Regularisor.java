@@ -9,14 +9,58 @@ public class CCD1Regularisor {
 
     CCDRegularisationStrategy strategy;
     Double value;
+    /** Second pseudocount (beta) for NNI-derived splits under {@link CCDRegularisationStrategy#AdditiveXY}. */
+    Double value2;
 
     public CCD1Regularisor(CCDRegularisationStrategy strategy, double value) {
         this.strategy = strategy;
         this.value = value;
     }
 
+    /**
+     * Two-level additive smoothing: pseudocount {@code value} (alpha) for
+     * observed and split-expanded splits, and {@code value2} (beta) for
+     * NNI-derived splits (those touching an NNI-expanded clade). Intended with
+     * {@link CCDRegularisationStrategy#AdditiveXY}.
+     *
+     * @param strategy regularisation strategy (use AdditiveXY)
+     * @param value    pseudocount alpha for regular splits
+     * @param value2   pseudocount beta for NNI-derived splits
+     */
+    public CCD1Regularisor(CCDRegularisationStrategy strategy, double value, double value2) {
+        this.strategy = strategy;
+        this.value = value;
+        this.value2 = value2;
+    }
+
     public CCD1Regularisor(CCDRegularisationStrategy strategy) {
         this.strategy = strategy;
+    }
+
+    /** Whether a split (parent -&gt; {child0, child1}) is NNI-derived, i.e. touches a novel clade. */
+    public static boolean isNNISplit(Clade parent, CladePartition partition) {
+        return parent.isNNIExpanded()
+                || partition.getChildClades()[0].isNNIExpanded()
+                || partition.getChildClades()[1].isNNIExpanded();
+    }
+
+    /* Two-level additive smoothing for one clade. */
+    private void regulariseAdditiveXY(Clade clade) {
+        double alpha = this.value;
+        double beta = this.value2;
+
+        double denominator = clade.getNumberOfOccurrences();
+        for (CladePartition partition : clade.getPartitions()) {
+            denominator += isNNISplit(clade, partition) ? beta : alpha;
+        }
+
+        for (CladePartition partition : clade.getPartitions()) {
+            if (partition.isCCPSet()) {
+                throw new AssertionError("Cannot regularize CCD1 with set CCPs, only with sample-based ones.");
+            }
+            double addend = isNNISplit(clade, partition) ? beta : alpha;
+            partition.setCCP((partition.getNumberOfOccurrences() + addend) / denominator);
+        }
     }
 
     public void regularise(CCD1 ccd) {
@@ -29,9 +73,15 @@ public class CCD1Regularisor {
                 continue;
             }
 
+            if (strategy == CCDRegularisationStrategy.AdditiveXY) {
+                regulariseAdditiveXY(clade);
+                continue;
+            }
+
             double denominator = clade.getNumberOfOccurrences() + switch (strategy) {
                 case AdditiveOne -> clade.getNumberOfPartitions();
                 case AdditiveX -> clade.getNumberOfPartitions() * value;
+                case AdditiveXY -> throw new AssertionError("AdditiveXY handled separately");
                 case PriorOne -> 1;
                 case PriorScaled -> value;
             };
@@ -62,6 +112,7 @@ public class CCD1Regularisor {
                 double addend = switch (strategy) {
                     case AdditiveOne -> 1;
                     case AdditiveX -> value;
+                    case AdditiveXY -> throw new AssertionError("AdditiveXY handled separately");
                     case PriorOne -> priorProbs[i];
                     case PriorScaled -> priorProbs[i] * value;
                 };

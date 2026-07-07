@@ -9,6 +9,7 @@ import ccd.model.CCD0;
 import ccd.model.CCD1;
 import ccd.model.CCD2;
 import ccd.model.CCDType;
+import ccd.model.KRegCCD;
 import ccd.model.OptRegCCD;
 import ccd.model.RegCCD;
 
@@ -71,6 +72,24 @@ public class CCDToolUtil {
         return ccd;
     }
 
+    /**
+     * Materialises all trees of a (burn-in-free) tree set into a list, e.g. for cross-validation
+     * that needs to partition the trees.
+     *
+     * @param treeSet the tree set to read
+     * @return all of its trees, in order
+     * @throws IOException if the underlying tree file cannot be read
+     */
+    public static java.util.List<beast.base.evolution.tree.Tree> treesFromSet(
+            TreeAnnotator.MemoryFriendlyTreeSet treeSet) throws IOException {
+        java.util.List<beast.base.evolution.tree.Tree> trees = new java.util.ArrayList<>();
+        treeSet.reset();
+        while (treeSet.hasNext()) {
+            trees.add(treeSet.next());
+        }
+        return trees;
+    }
+
     public static AbstractCCD getCCDTypeByName(TreeAnnotator.MemoryFriendlyTreeSet treeSet, CCDType ccdType) {
         AbstractCCD ccd;
         if (ccdType == CCDType.CCD0) {
@@ -83,6 +102,9 @@ public class CCDToolUtil {
             ccd = new RegCCD(treeSet);
         } else if (ccdType == CCDType.OptRegCCD) {
             ccd = new OptRegCCD(treeSet);
+        } else if (ccdType == CCDType.KRegCCD) {
+            ccd = new KRegCCD(treeSet, KRegCCD.DEFAULT_MU, KRegCCD.DEFAULT_ALPHA,
+                    KRegCCD.DEFAULT_RESERVE_DEPTH, KRegCCD.TailMode.BOUND);
         } else {
             throw new IllegalArgumentException("Illegal CCD type.");
         }

@@ -1,5 +1,7 @@
 package ccd.model.bitsets;
 
+import ccd.model.Clade;
+
 /**
  * Stripped down version of {@link java.util.BitSet} adapted for speedup;
  * safety checks on sizes removed and special child classes for small bitsets used.
@@ -153,6 +155,30 @@ public class BitSet implements Cloneable {
 
         int wordIndex = wordIndex(bitIndex);
         return ((words[wordIndex] & (1L << bitIndex)) != 0);
+    }
+
+    /**
+     * Returns the subset of the bitSet with specified from (inclusive) and to (exclusive) indices.
+     * The subset is a copy that is independent of the original bitSet.
+     *
+     * @param fromBitIndex the starting (inclusive) bit index
+     * @param toBitIndex   the ending (exclusive) bit index
+     * @return the subset of the bitSet given specified from (inclusive) and to (exclusive) indices
+     * @throws IndexOutOfBoundsException if the starting index is negative or the ending index < the starting index
+     */
+    public BitSet getSubset(int fromBitIndex, int toBitIndex) {
+        if (fromBitIndex < 0)
+            throw new IndexOutOfBoundsException("fromBitIndex < 0: " + fromBitIndex);
+        if (toBitIndex < fromBitIndex)
+            throw new IndexOutOfBoundsException("toBitIndex < fromBitIndex");
+
+        BitSet subset = new BitSet(toBitIndex - fromBitIndex);
+        for (int i = fromBitIndex; i < toBitIndex; i++) {
+            if (this.get(i)) {
+                subset.set(i - fromBitIndex);
+            }
+        }
+        return subset;
     }
 
     /**
@@ -501,7 +527,6 @@ public class BitSet implements Cloneable {
 
         return true;
     }
-
 
     /**
      * Returns the index of the last bit that is set to {@code true}
