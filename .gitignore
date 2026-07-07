@@ -1,7 +1,9 @@
 CCD.iml
 build/
+target/
 release/
 out/
+*.zip
 .idea/
 .classpath
 .DS_Store

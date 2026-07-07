@@ -1,4 +1,4 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
@@ -8,15 +8,15 @@ import ccd.model.CCD1;
 import ccd.model.CCD2;
 import ccd.model.HeightSettingStrategy;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Core unit tests for CCD0, CCD1, and CCD2 models.
@@ -42,7 +42,7 @@ public class CCDCoreTest {
     private List<Tree> mixedTrees;   // 6xT1 + 2xT2 + 2xT3 = 10 trees
     private Tree t1, t2, t3, unseenTree;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         AbstractCCD.verbose = false;
 
@@ -100,26 +100,26 @@ public class CCDCoreTest {
         double p3 = ccd.getProbabilityOfTree(t3);
 
         // All input trees should have positive probability
-        assertTrue("T1 should have positive probability", p1 > 0);
-        assertTrue("T2 should have positive probability", p2 > 0);
-        assertTrue("T3 should have positive probability", p3 > 0);
+        assertTrue(p1 > 0, "T1 should have positive probability");
+        assertTrue(p2 > 0, "T2 should have positive probability");
+        assertTrue(p3 > 0, "T3 should have positive probability");
 
         // T1 appeared 6/10 times, should have highest probability
-        assertTrue("T1 should have highest probability", p1 > p2);
-        assertTrue("T1 should have highest probability", p1 > p3);
+        assertTrue(p1 > p2, "T1 should have highest probability");
+        assertTrue(p1 > p3, "T1 should have highest probability");
     }
 
     @Test
     public void testCCD1_containsTree() {
         CCD1 ccd = new CCD1(mixedTrees, 0.0);
 
-        assertTrue("CCD1 should contain T1", ccd.containsTree(t1));
-        assertTrue("CCD1 should contain T2", ccd.containsTree(t2));
-        assertTrue("CCD1 should contain T3", ccd.containsTree(t3));
+        assertTrue(ccd.containsTree(t1), "CCD1 should contain T1");
+        assertTrue(ccd.containsTree(t2), "CCD1 should contain T2");
+        assertTrue(ccd.containsTree(t3), "CCD1 should contain T3");
 
         // CCD1 only assigns nonzero probability to trees whose clade partitions
         // were all observed; an unseen topology with novel partitions should not be contained
-        assertFalse("CCD1 should not contain unseen topology", ccd.containsTree(unseenTree));
+        assertFalse(ccd.containsTree(unseenTree), "CCD1 should not contain unseen topology");
     }
 
     @Test
@@ -130,7 +130,7 @@ public class CCDCoreTest {
         // MAP should be T1 (highest frequency)
         double mapProb = ccd.getProbabilityOfTree(mapTree);
         double t1Prob = ccd.getProbabilityOfTree(t1);
-        assertEquals("MAP tree should have same probability as T1", t1Prob, mapProb, 1e-9);
+        assertEquals(t1Prob, mapProb, 1e-9, "MAP tree should have same probability as T1");
     }
 
     @Test
@@ -140,9 +140,8 @@ public class CCDCoreTest {
 
         for (int i = 0; i < 100; i++) {
             Tree sampled = ccd.sampleTree();
-            assertNotNull("Sampled tree should not be null", sampled);
-            assertTrue("Sampled tree should be contained in CCD",
-                    ccd.getProbabilityOfTree(sampled) > 0);
+            assertNotNull(sampled, "Sampled tree should not be null");
+            assertTrue(ccd.getProbabilityOfTree(sampled) > 0, "Sampled tree should be contained in CCD");
         }
     }
 
@@ -163,8 +162,8 @@ public class CCDCoreTest {
         }
 
         double empiricalFreq = (double) t1Count / nSamples;
-        assertEquals("Sampled frequency of T1 should approximate its CCD probability",
-                t1Prob, empiricalFreq, 0.05);
+        assertEquals(t1Prob, empiricalFreq, 0.05,
+                "Sampled frequency of T1 should approximate its CCD probability");
     }
 
     @Test
@@ -195,8 +194,8 @@ public class CCDCoreTest {
 
         // CCD1 can assign probability to unobserved topologies that share
         // observed clade partitions. So sum of observed trees <= 1.
-        assertTrue("Sum of observed tree probabilities should be <= 1", sum <= 1.0 + 1e-9);
-        assertTrue("Sum of observed tree probabilities should be substantial", sum > 0.5);
+        assertTrue(sum <= 1.0 + 1e-9, "Sum of observed tree probabilities should be <= 1");
+        assertTrue(sum > 0.5, "Sum of observed tree probabilities should be substantial");
     }
 
     // ======================== CCD0 Tests ========================
@@ -206,7 +205,7 @@ public class CCDCoreTest {
         List<Tree> trees = Collections.singletonList(parseNewick(FOUR_TAXON_NEWICK));
         CCD0 ccd = new CCD0(trees, 0.0);
         // CCD0 expands the graph, so may have more clades than observed
-        assertTrue("CCD0 should have at least 7 clades", ccd.getNumberOfClades() >= 7);
+        assertTrue(ccd.getNumberOfClades() >= 7, "CCD0 should have at least 7 clades");
     }
 
     @Test
@@ -218,11 +217,11 @@ public class CCDCoreTest {
         double prob = ccd.getProbabilityOfTree(mapTree);
 
         // With identical trees, MAP tree should have the highest probability
-        assertTrue("MAP probability should be high", prob > 0.5);
+        assertTrue(prob > 0.5, "MAP probability should be high");
 
         // The input topology should have highest probability
         double t1Prob = ccd.getProbabilityOfTree(t1);
-        assertTrue("T1 should have high probability", t1Prob > 0.5);
+        assertTrue(t1Prob > 0.5, "T1 should have high probability");
     }
 
     @Test
@@ -232,9 +231,9 @@ public class CCDCoreTest {
         double p1 = ccd.getProbabilityOfTree(t1);
         double p2 = ccd.getProbabilityOfTree(t2);
 
-        assertTrue("T1 should have positive probability", p1 > 0);
-        assertTrue("T2 should have positive probability", p2 > 0);
-        assertTrue("T1 should have higher probability than T2", p1 > p2);
+        assertTrue(p1 > 0, "T1 should have positive probability");
+        assertTrue(p2 > 0, "T2 should have positive probability");
+        assertTrue(p1 > p2, "T1 should have higher probability than T2");
     }
 
     @Test
@@ -243,12 +242,12 @@ public class CCDCoreTest {
         Tree mapTree = ccd.getMAPTree();
 
         double mapProb = ccd.getProbabilityOfTree(mapTree);
-        assertTrue("MAP tree should have positive probability", mapProb > 0);
+        assertTrue(mapProb > 0, "MAP tree should have positive probability");
 
         // MAP should have probability >= any input tree
-        assertTrue("MAP >= T1", mapProb >= ccd.getProbabilityOfTree(t1) - 1e-9);
-        assertTrue("MAP >= T2", mapProb >= ccd.getProbabilityOfTree(t2) - 1e-9);
-        assertTrue("MAP >= T3", mapProb >= ccd.getProbabilityOfTree(t3) - 1e-9);
+        assertTrue(mapProb >= ccd.getProbabilityOfTree(t1) - 1e-9, "MAP >= T1");
+        assertTrue(mapProb >= ccd.getProbabilityOfTree(t2) - 1e-9, "MAP >= T2");
+        assertTrue(mapProb >= ccd.getProbabilityOfTree(t3) - 1e-9, "MAP >= T3");
     }
 
     @Test
@@ -258,9 +257,8 @@ public class CCDCoreTest {
 
         for (int i = 0; i < 50; i++) {
             Tree sampled = ccd.sampleTree();
-            assertNotNull("Sampled tree should not be null", sampled);
-            assertTrue("Sampled tree should have positive probability",
-                    ccd.getProbabilityOfTree(sampled) > 0);
+            assertNotNull(sampled, "Sampled tree should not be null");
+            assertTrue(ccd.getProbabilityOfTree(sampled) > 0, "Sampled tree should have positive probability");
         }
     }
 
@@ -276,7 +274,7 @@ public class CCDCoreTest {
         // T1 should dominate since burnin discards first 5 (T2) trees
         Tree mapTree = ccd.getMAPTree();
         double mapProb = ccd.getProbabilityOfTree(mapTree);
-        assertTrue("MAP should have high probability after burnin", mapProb > 0.5);
+        assertTrue(mapProb > 0.5, "MAP should have high probability after burnin");
     }
 
     @Test
@@ -288,7 +286,7 @@ public class CCDCoreTest {
         // This is a property test: CCD0 may or may not contain unseen trees
         // depending on the expansion. We just check it doesn't crash.
         double prob = ccd.getProbabilityOfTree(unseenTree);
-        assertTrue("Probability should be non-negative", prob >= 0);
+        assertTrue(prob >= 0, "Probability should be non-negative");
     }
 
     // ======================== CCD2 Tests ========================
@@ -301,8 +299,8 @@ public class CCDCoreTest {
         CCD2 ccd = new CCD2(trees, 0.0);
         // 4-taxon rooted binary tree has 7 standard clades,
         // but CCD2 may count differently due to root handling
-        assertTrue("CCD2 should have at least 6 clades", ccd.getNumberOfClades() >= 6);
-        assertTrue("CCD2 should not exceed 7 clades", ccd.getNumberOfClades() <= 7);
+        assertTrue(ccd.getNumberOfClades() >= 6, "CCD2 should have at least 6 clades");
+        assertTrue(ccd.getNumberOfClades() <= 7, "CCD2 should not exceed 7 clades");
     }
 
     @Test
@@ -324,20 +322,20 @@ public class CCDCoreTest {
         double p2 = ccd.getProbabilityOfTree(t2);
         double p3 = ccd.getProbabilityOfTree(t3);
 
-        assertTrue("T1 should have positive probability", p1 > 0);
-        assertTrue("T2 should have positive probability", p2 > 0);
-        assertTrue("T3 should have positive probability", p3 > 0);
-        assertTrue("T1 should have highest probability", p1 > p2);
-        assertTrue("T1 should have highest probability", p1 > p3);
+        assertTrue(p1 > 0, "T1 should have positive probability");
+        assertTrue(p2 > 0, "T2 should have positive probability");
+        assertTrue(p3 > 0, "T3 should have positive probability");
+        assertTrue(p1 > p2, "T1 should have highest probability");
+        assertTrue(p1 > p3, "T1 should have highest probability");
     }
 
     @Test
     public void testCCD2_containsTree() {
         CCD2 ccd = new CCD2(mixedTrees, 0.0);
 
-        assertTrue("CCD2 should contain T1", ccd.containsTree(t1));
-        assertTrue("CCD2 should contain T2", ccd.containsTree(t2));
-        assertTrue("CCD2 should contain T3", ccd.containsTree(t3));
+        assertTrue(ccd.containsTree(t1), "CCD2 should contain T1");
+        assertTrue(ccd.containsTree(t2), "CCD2 should contain T2");
+        assertTrue(ccd.containsTree(t3), "CCD2 should contain T3");
     }
 
     @Test
@@ -347,7 +345,7 @@ public class CCDCoreTest {
 
         double mapProb = ccd.getProbabilityOfTree(mapTree);
         double t1Prob = ccd.getProbabilityOfTree(t1);
-        assertEquals("MAP tree should have same probability as T1", t1Prob, mapProb, 1e-9);
+        assertEquals(t1Prob, mapProb, 1e-9, "MAP tree should have same probability as T1");
     }
 
     @Test
@@ -357,9 +355,8 @@ public class CCDCoreTest {
 
         for (int i = 0; i < 100; i++) {
             Tree sampled = ccd.sampleTree();
-            assertNotNull("Sampled tree should not be null", sampled);
-            assertTrue("Sampled tree should have positive probability",
-                    ccd.getProbabilityOfTree(sampled) > 0);
+            assertNotNull(sampled, "Sampled tree should not be null");
+            assertTrue(ccd.getProbabilityOfTree(sampled) > 0, "Sampled tree should have positive probability");
         }
     }
 
@@ -412,9 +409,9 @@ public class CCDCoreTest {
         int c2 = ccd2.getNumberOfClades();
 
         // CCD2 should have at least as many clades as CCD1
-        assertTrue("CCD2 should have >= CCD1 clades", c2 >= c1);
+        assertTrue(c2 >= c1, "CCD2 should have >= CCD1 clades");
 
         // CCD0 expands the graph and should have the most clades
-        assertTrue("CCD0 should have >= CCD1 clades", c0 >= c1);
+        assertTrue(c0 >= c1, "CCD0 should have >= CCD1 clades");
     }
 }

@@ -5,7 +5,7 @@ import beastfx.app.treeannotator.TreeAnnotator;
 import ccd.algorithms.regularisation.CCD1Regularisor;
 import ccd.algorithms.regularisation.CCDRegularisationStrategy;
 import ccd.algorithms.regularisation.RegCCDParameterOptimiser;
-import org.apache.commons.math3.analysis.UnivariateFunction;
+import org.apache.commons.math4.legacy.analysis.UnivariateFunction;
 
 import java.util.List;
 
