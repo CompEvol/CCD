@@ -1953,16 +1953,18 @@ public class KRegCCD extends RegCCD {
         int last = 2;
         boolean anyNonzero = false;
         enumOps.get()[0] = 0;
-        if (reserveBoundary == 4) {
-            // Default reserve depth k = 2: boundary-3 (N_1) and boundary-4 (N_2) share one pair pass.
+        if (reserveBoundary == 3 || reserveBoundary == 4) {
+            // Fast path for the practical reserve depths: k = 1 (N_1 only) or k = 2 (N_1 and N_2),
+            // sharing one weighted-sum disjoint-pair pass. N_2 is skipped entirely when k = 1.
+            boolean computeN2 = reserveBoundary == 4 && c.size() >= 4;
             try {
-                long[] n12 = countN1N2(c, subs);
+                long[] n12 = countN1N2(c, subs, computeN2);
                 n[3] = (int) n12[0];
                 last = 3;
                 if (n[3] > 0) {
                     anyNonzero = true;
                 }
-                if (c.size() >= 4) {
+                if (computeN2) {
                     n[4] = (int) n12[1];
                     last = 4;
                     if (n[4] > 0) {
@@ -1972,8 +1974,8 @@ public class KRegCCD extends RegCCD {
             } catch (BudgetExceeded e) {
                 // pathological pair blow-up: leave N_1/N_2 = 0 (same capped-out reserve as before)
             }
-            // Only climb to deeper orders if boundaries 3 and 4 were both empty (keeps eps positive).
-            for (int j = 5; j <= c.size() && !anyNonzero; j++) {
+            // Only climb past the reserve depth if all computed orders were empty (keeps eps positive).
+            for (int j = last + 1; j <= c.size() && !anyNonzero; j++) {
                 try {
                     n[j] = countNj(c, subs, j, false);
                 } catch (BudgetExceeded e) {
@@ -2263,8 +2265,11 @@ public class KRegCCD extends RegCCD {
      * the subclades), and the boundary-4 complement is another disjoint pair with that sum. Every hit
      * is confirmed exactly with the cardinality/disjointness tiling test, so sum collisions and
      * wraparound are harmless. Honours the same {@link #enumOps}/{@link #opsBudget} guard.
+     *
+     * @param computeN2 when {@code false} (reserve depth k = 1, {@code eps} from {@code N_1} alone)
+     *                  the boundary-4 stash and match are skipped and {@code N_2} is returned as 0.
      */
-    private long[] countN1N2(Clade c, List<Clade> subs) {
+    private long[] countN1N2(Clade c, List<Clade> subs, boolean computeN2) {
         int m = subs.size();
         BitSet[] sb = new BitSet[m];
         long[] partSum = new long[m];
@@ -2333,24 +2338,26 @@ public class KRegCCD extends RegCCD {
                         n1 += (novelMode == NovelMode.FLAT) ? res : 1;
                     }
                 }
-                if (P == cap) {
-                    cap <<= 1;
-                    ei = java.util.Arrays.copyOf(ei, cap);
-                    ej = java.util.Arrays.copyOf(ej, cap);
-                    eh = java.util.Arrays.copyOf(eh, cap);
-                    sU = java.util.Arrays.copyOf(sU, cap);
+                if (computeN2) {
+                    if (P == cap) {
+                        cap <<= 1;
+                        ei = java.util.Arrays.copyOf(ei, cap);
+                        ej = java.util.Arrays.copyOf(ej, cap);
+                        eh = java.util.Arrays.copyOf(eh, cap);
+                        sU = java.util.Arrays.copyOf(sU, cap);
+                    }
+                    ei[P] = i;
+                    ej[P] = j;
+                    sU[P] = s;
+                    eh[P] = mixHash(s);
+                    P++;
                 }
-                ei[P] = i;
-                ej[P] = j;
-                sU[P] = s;
-                eh[P] = mixHash(s);
-                P++;
             }
         }
 
         // boundary-4: match each pair with the pair whose union sum is the complement's, k > j.
         long n2 = 0;
-        if (P > 0) {
+        if (computeN2 && P > 0) {
             int tb = Integer.highestOneBit(P) << 1;
             int mask = tb - 1;
             int[] head = new int[tb];
