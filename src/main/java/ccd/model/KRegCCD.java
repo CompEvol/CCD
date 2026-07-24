@@ -984,10 +984,14 @@ public class KRegCCD extends RegCCD {
                                        Map<Clade, Double> freeMemo, Map<Clade, Double> redMemo) {
         List<Clade> subs = observedSubclades(c);
         BitSet cBits = c.getCladeInBits();
+        int lastBoundary = reg.lastBoundary();
         double[] acc = new double[2]; // [0] childEntropy, [1] extraLogPc (SHARED)
         enumOps.get()[0] = 0;
         try {
-            for (int m = 3; m <= reg.lastBoundary(); m++) {
+            // Orders 3 and 4 (the default reserve depth) via the fast sum-arithmetic pair pass.
+            blueContributionFast(subs, cBits, eps, lastBoundary, acc, freeMemo, redMemo);
+            // Deeper orders (only reached when boundaries 3 and 4 are both empty) keep the old walk.
+            for (int m = 5; m <= lastBoundary; m++) {
                 blueWalk(cBits, subs, m, 0, BitSet.newBitSet(leafArraySize), new ArrayList<>(m),
                         eps, acc, freeMemo, redMemo);
             }
@@ -995,6 +999,159 @@ public class KRegCCD extends RegCCD {
             // deeper boundaries omitted (negligible, like the reserve tail); same guard as countNj
         }
         return new BlueTerms(acc[0], acc[1]);
+    }
+
+    /**
+     * Accumulates the blue-region entropy terms for boundary orders 3 and 4 in one disjoint-pair
+     * pass, the entropy counterpart of {@link #countN1N2}: it enumerates the same boundaries by
+     * weighted-sum complement lookups, but at each boundary adds {@code boundaryMass * sum of the
+     * boundary parts' forced-red entropy} to {@code acc[0]} (and, in SHARED mode, the per-region
+     * {@code eps^(m-2) * log pathcount} self-information to {@code acc[1]}). Emits exactly the same
+     * boundaries as the old {@link #blueWalk} for these orders.
+     */
+    private void blueContributionFast(List<Clade> subs, BitSet cBits, double eps, int lastBoundary,
+                                      double[] acc, Map<Clade, Double> freeMemo,
+                                      Map<Clade, Double> redMemo) {
+        int m = subs.size();
+        BitSet[] sb = new BitSet[m];
+        long[] partSum = new long[m];
+        int[] partCard = new int[m];
+        double[] redH = new double[m]; // forced-red entropy of each boundary part (memoised lookup)
+        for (int i = 0; i < m; i++) {
+            sb[i] = subs.get(i).getCladeInBits();
+            partSum[i] = weightedSum(sb[i]);
+            partCard[i] = sb[i].cardinality();
+            redH[i] = entropyRedForced(subs.get(i), freeMemo, redMemo);
+        }
+        long sumC = weightedSum(cBits);
+        int cardC = cBits.cardinality();
+        boolean flat = novelMode == NovelMode.FLAT;
+        double eps1 = eps;         // eps^(3-2)
+        double eps2 = eps * eps;   // eps^(4-2)
+        boolean do4 = lastBoundary >= 4;
+        final long[] ops = enumOps.get();
+
+        int stb = Integer.highestOneBit(Math.max(1, m)) << 1;
+        int smask = stb - 1;
+        int[] subHead = new int[stb];
+        java.util.Arrays.fill(subHead, -1);
+        int[] subNxt = new int[m];
+        for (int i = 0; i < m; i++) {
+            int b = mixHash(partSum[i]) & smask;
+            subNxt[i] = subHead[b];
+            subHead[b] = i;
+        }
+
+        int cap = 256, P = 0;
+        int[] ei = new int[cap], ej = new int[cap], eh = new int[cap];
+        long[] sU = new long[cap];
+        BitSet ue = BitSet.newBitSet(leafArraySize);
+        BitSet uf = BitSet.newBitSet(leafArraySize);
+        for (int i = 0; i < m; i++) {
+            BitSet a = sb[i];
+            for (int j = i + 1; j < m; j++) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                if (a.intersects(sb[j])) {
+                    continue;
+                }
+                long s = partSum[i] + partSum[j];
+                long sR = sumC - s;
+                boolean ueBuilt = false;
+                for (int d = subHead[mixHash(sR) & smask]; d >= 0; d = subNxt[d]) {
+                    if (d <= j || partSum[d] != sR) {
+                        continue;
+                    }
+                    if (partCard[i] + partCard[j] + partCard[d] != cardC) {
+                        continue;
+                    }
+                    if (!ueBuilt) {
+                        ue.clear();
+                        ue.or(a);
+                        ue.or(sb[j]);
+                        ueBuilt = true;
+                    }
+                    if (ue.intersects(sb[d])) {
+                        continue;
+                    }
+                    BitSet[] parts = {sb[i], sb[j], sb[d]};
+                    int pc = countAllNovelResolutions(cBits, parts);
+                    if (pc > 0) {
+                        double childH = redH[i] + redH[j] + redH[d];
+                        acc[0] += (flat ? pc * eps1 : eps1) * childH;
+                        if (!flat) {
+                            acc[1] += eps1 * Math.log(pc);
+                        }
+                    }
+                }
+                if (do4) {
+                    if (P == cap) {
+                        cap <<= 1;
+                        ei = java.util.Arrays.copyOf(ei, cap);
+                        ej = java.util.Arrays.copyOf(ej, cap);
+                        eh = java.util.Arrays.copyOf(eh, cap);
+                        sU = java.util.Arrays.copyOf(sU, cap);
+                    }
+                    ei[P] = i;
+                    ej[P] = j;
+                    sU[P] = s;
+                    eh[P] = mixHash(s);
+                    P++;
+                }
+            }
+        }
+        if (!do4 || P == 0) {
+            return;
+        }
+        int tb = Integer.highestOneBit(P) << 1;
+        int mask = tb - 1;
+        int[] head = new int[tb];
+        java.util.Arrays.fill(head, -1);
+        int[] nxt = new int[P];
+        for (int e = 0; e < P; e++) {
+            int b = eh[e] & mask;
+            nxt[e] = head[b];
+            head[b] = e;
+        }
+        for (int e = 0; e < P; e++) {
+            int i = ei[e], j = ej[e];
+            long sR = sumC - sU[e];
+            boolean ueBuilt = false;
+            for (int f = head[mixHash(sR) & mask]; f >= 0; f = nxt[f]) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                int k = ei[f], l = ej[f];
+                if (k <= j) {
+                    continue;
+                }
+                if (partCard[i] + partCard[j] + partCard[k] + partCard[l] != cardC) {
+                    continue;
+                }
+                if (!ueBuilt) {
+                    ue.clear();
+                    ue.or(sb[i]);
+                    ue.or(sb[j]);
+                    ueBuilt = true;
+                }
+                uf.clear();
+                uf.or(sb[k]);
+                uf.or(sb[l]);
+                if (ue.intersects(uf)) {
+                    continue;
+                }
+                BitSet[] parts = {sb[i], sb[j], sb[k], sb[l]};
+                int pc = countAllNovelResolutions(cBits, parts);
+                if (pc > 0) {
+                    double childH = redH[i] + redH[j] + redH[k] + redH[l];
+                    acc[0] += (flat ? pc * eps2 : eps2) * childH;
+                    if (!flat) {
+                        acc[1] += eps2 * Math.log(pc);
+                    }
+                }
+            }
+        }
     }
 
     private void blueWalk(BitSet cBits, List<Clade> subs, int m, int startIdx, BitSet used,
