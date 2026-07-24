@@ -889,13 +889,29 @@ public class KRegCCD extends RegCCD {
      * KRegCCD distribution
      */
     public double getEntropyRecursive() {
-        Map<Clade, Double> freeMemo = new HashMap<>();
-        Map<Clade, Double> redMemo = new HashMap<>();
-        List<Clade> clades = new ArrayList<>(getClades());
-        clades.sort((a, b) -> Integer.compare(a.size(), b.size()));
-        for (Clade c : clades) {
-            entropyRedForced(c, freeMemo, redMemo);
-            entropyFree(c, freeMemo, redMemo);
+        Map<Clade, Double> freeMemo = new ConcurrentHashMap<>();
+        Map<Clade, Double> redMemo = new ConcurrentHashMap<>();
+        // Both entropyRedForced(c) and entropyFree(c) read only strictly-smaller clades (a clade's
+        // partition children and its blue-region boundary parts are all smaller than it), so once
+        // every smaller size level is memoised, all clades of a given size are independent and can
+        // be computed in parallel -- exactly as precomputeReserves parallelises computeReg. Each
+        // task writes only its own clade's freeMemo/redMemo entries (a concurrent map), and the
+        // per-clade arithmetic is unchanged, so the entropy is identical to the serial computation.
+        List<List<Clade>> bySize = new ArrayList<>(leafArraySize + 1);
+        for (int s = 0; s <= leafArraySize; s++) {
+            bySize.add(new ArrayList<>());
+        }
+        for (Clade c : getClades()) {
+            bySize.get(c.size()).add(c);
+        }
+        for (int s = 1; s <= leafArraySize; s++) {
+            List<Clade> level = bySize.get(s);
+            if (!level.isEmpty()) {
+                level.parallelStream().forEach(c -> {
+                    entropyRedForced(c, freeMemo, redMemo);
+                    entropyFree(c, freeMemo, redMemo);
+                });
+            }
         }
         return freeMemo.getOrDefault(getRootClade(), 0.0);
     }
