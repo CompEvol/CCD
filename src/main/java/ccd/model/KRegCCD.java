@@ -1921,9 +1921,127 @@ public class KRegCCD extends RegCCD {
      * resolution. earlyExit returns 1 as soon as one is found. */
     private int countNj(Clade c, List<Clade> subs, int m, boolean earlyExit) {
         BitSet cBits = c.getCladeInBits();
+        if (m == 4) {
+            // Boundary-4 (N_2) dominates construction: the generic enumerate is O(m^3) (choose 3
+            // parts, derive the 4th as the complement), so on the big clades it burns the whole
+            // op-budget. A 4-part boundary is exactly two disjoint observed PAIRS whose unions are
+            // complementary within C, so we can meet in the middle: enumerate the O(m^2) disjoint
+            // pairs once, bucket them by their union bitset, then match each union U with C\U. This
+            // visits only combinations that actually tile C (no rejected triples) -- O(m^2) build
+            // plus one visit per valid boundary -- and returns exactly the same count as enumerate
+            // for both FLAT (sum of pathcounts) and SHARED (admissible-boundary indicator).
+            return countN2ViaPairs(cBits, subs, earlyExit);
+        }
         BitSet used = BitSet.newBitSet(leafArraySize);
         List<BitSet> chosen = new ArrayList<>(m);
         return enumerate(cBits, subs, m, 0, used, chosen, earlyExit);
+    }
+
+    /**
+     * Meet-in-the-middle count of boundary-4 (N_2) partitions of {@code cBits} into observed
+     * subclades (see {@link #countNj}). A 4-part boundary {@code P1<P2<P3<P4} is the pairing
+     * {P1,P2} | {P3,P4} of two disjoint observed pairs whose unions are complementary in C. We
+     * hash every disjoint observed pair by its union bitset, then for each pair {@code (i,j)} look
+     * up the pairs {@code (k,l)} whose union equals {@code C∖union(i,j)} with {@code k > j}, so
+     * each boundary is emitted exactly once (indices {@code i<j<k<l}). This runs the O(m^2) pair
+     * scan and the boundary match with <em>no per-pair heap allocation</em> — the pair union is
+     * built into a reused scratch and pairs are held in flat {@code int[]} arrays keyed by a
+     * chained open hash — which is ~6x the earlier {@code HashMap<BitSet>}-per-pair form and the
+     * dominant cost of building the reserves. Shares the per-clade {@link #enumOps}/{@link
+     * #opsBudget} guard with {@link #enumerate}, so a pathological clade still degrades gracefully
+     * to the same capped-out {@code N_2 = 0}.
+     */
+    private int countN2ViaPairs(BitSet cBits, List<Clade> subs, boolean earlyExit) {
+        int m = subs.size();
+        BitSet[] sb = new BitSet[m];
+        for (int i = 0; i < m; i++) {
+            sb[i] = subs.get(i).getCladeInBits();
+        }
+        final long[] ops = enumOps.get();
+
+        // Enumerate disjoint observed pairs into flat arrays: entry e is pair (ei[e], ej[e]),
+        // hashed by its union bitset. The union is computed into a reused scratch (no clone).
+        int cap = 256, P = 0;
+        int[] ei = new int[cap], ej = new int[cap], eh = new int[cap];
+        BitSet u = BitSet.newBitSet(leafArraySize);
+        for (int i = 0; i < m; i++) {
+            BitSet a = sb[i];
+            for (int j = i + 1; j < m; j++) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                if (a.intersects(sb[j])) {
+                    continue;
+                }
+                u.clear();
+                u.or(a);
+                u.or(sb[j]);
+                if (P == cap) {
+                    cap <<= 1;
+                    ei = java.util.Arrays.copyOf(ei, cap);
+                    ej = java.util.Arrays.copyOf(ej, cap);
+                    eh = java.util.Arrays.copyOf(eh, cap);
+                }
+                ei[P] = i;
+                ej[P] = j;
+                eh[P] = u.hashCode();
+                P++;
+            }
+        }
+        if (P == 0) {
+            return 0;
+        }
+
+        // Chained open hash over the pair-union hashes, so a pair can be found by its union.
+        int tb = Integer.highestOneBit(P) << 1; // power of two in [P, 2P)
+        int mask = tb - 1;
+        int[] head = new int[tb];
+        java.util.Arrays.fill(head, -1);
+        int[] nxt = new int[P];
+        for (int e = 0; e < P; e++) {
+            int b = eh[e] & mask;
+            nxt[e] = head[b];
+            head[b] = e;
+        }
+
+        // For each pair (i,j), match pairs (k,l) with union(k,l) == C∖union(i,j) and k > j.
+        int count = 0;
+        BitSet r = BitSet.newBitSet(leafArraySize);
+        BitSet u2 = BitSet.newBitSet(leafArraySize);
+        for (int e = 0; e < P; e++) {
+            int i = ei[e], j = ej[e];
+            r.clear();
+            r.or(cBits);
+            r.andNot(sb[i]);
+            r.andNot(sb[j]);
+            if (r.cardinality() == 0) {
+                continue;
+            }
+            for (int f = head[r.hashCode() & mask]; f >= 0; f = nxt[f]) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                int k = ei[f], l = ej[f];
+                if (k <= j) {
+                    continue; // canonical i<j<k<l, so each boundary is counted once
+                }
+                u2.clear();
+                u2.or(sb[k]);
+                u2.or(sb[l]);
+                if (!u2.equals(r)) {
+                    continue; // hash collision: union(k,l) != C∖union(i,j)
+                }
+                BitSet[] parts = {sb[i], sb[j], sb[k], sb[l]};
+                int res = countAllNovelResolutions(cBits, parts);
+                if (res > 0) {
+                    count += (novelMode == NovelMode.FLAT) ? res : 1;
+                    if (earlyExit) {
+                        return count;
+                    }
+                }
+            }
+        }
+        return count;
     }
 
     /* Recursive canonical enumeration: pick (m-1) parts at strictly increasing
