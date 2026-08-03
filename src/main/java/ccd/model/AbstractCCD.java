@@ -871,6 +871,64 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return getTreeBasedOnStrategy(SamplingStrategy.Sampling, heightStrategy);
     }
 
+    /** As {@link #sampleTrees(int, HeightSettingStrategy)} with {@link HeightSettingStrategy#None}. */
+    public List<Tree> sampleTrees(int count) {
+        return sampleTrees(count, HeightSettingStrategy.None);
+    }
+
+    /**
+     * Draws {@code count} trees, in parallel. Individual draws are independent -- they only read
+     * the clade DAG and its cached probabilities -- so the one-at-a-time
+     * {@link #sampleTree(HeightSettingStrategy)} loop leaves all but one core idle. This warms
+     * every lazily-built structure first (so the draws themselves are pure reads) and then fans
+     * the draws out.
+     *
+     * <p>The result is reproducible: the per-draw seeds are taken from the shared {@link #random}
+     * <em>serially</em>, before the fan-out, so a given {@link #setRandom} state yields the same
+     * trees in the same order however the draws happen to be scheduled.
+     *
+     * @param count          number of trees to draw
+     * @param heightStrategy how node heights are set (see {@link HeightSettingStrategy})
+     * @return the sampled trees, in draw order
+     */
+    public List<Tree> sampleTrees(int count, HeightSettingStrategy heightStrategy) {
+        if (count < 0) {
+            throw new IllegalArgumentException("count must be non-negative, got " + count);
+        }
+        if (count == 0) {
+            return List.of();
+        }
+
+        // Warm everything lazily built, serially -- the parallel draws below must only read.
+        tidyUpCacheIfDirty();
+        computeCladeProbabilitiesIfDirty();
+        if (heightStrategy == HeightSettingStrategy.CommonAncestorHeights) {
+            setupCommonAncestorHeightsIfDirty();
+        }
+        prepareForSampling();
+
+        long[] seeds = new long[count];
+        for (int i = 0; i < count; i++) {
+            seeds[i] = random.nextLong();
+        }
+
+        return java.util.stream.IntStream.range(0, count).parallel().mapToObj(i -> {
+            threadRandom.set(new Random(seeds[i]));
+            try {
+                return getTreeBasedOnStrategy(SamplingStrategy.Sampling, heightStrategy);
+            } finally {
+                threadRandom.remove();
+            }
+        }).toList();
+    }
+
+    /**
+     * Hook for subclasses to precompute any per-clade state that a draw would otherwise solve
+     * lazily, so that {@link #sampleTrees} fans out over pure reads. Does nothing by default.
+     */
+    protected void prepareForSampling() {
+    }
+
     @Override
     public Tree getMAPTree() {
         return this.getMAPTree(HeightSettingStrategy.One);
@@ -881,8 +939,24 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return getTreeBasedOnStrategy(SamplingStrategy.MAP, heightStrategy);
     }
 
-    /* Helper for methods to assign indices to inner vertices */
-    private int runningInnerIndex;
+    /* Helper for methods to assign indices to inner vertices. Thread-local so that concurrent
+     * draws (see sampleTrees) each number their own tree's inner nodes from
+     * getSizeOfLeavesArray() upwards, without treading on one another. */
+    private final ThreadLocal<int[]> runningInnerIndex = ThreadLocal.withInitial(() -> new int[1]);
+
+    /* Per-thread RNG installed by sampleTrees for the duration of one draw; null (meaning "use
+     * the shared `random`") on any thread that is not inside a parallel sampling run. */
+    private final ThreadLocal<Random> threadRandom = new ThreadLocal<>();
+
+    /**
+     * The RNG the calling thread should sample with: its own stream inside a
+     * {@link #sampleTrees} draw, otherwise the shared {@link #random} (so single-threaded
+     * sampling and {@link #setRandom} behave exactly as before).
+     */
+    protected Random random() {
+        Random threadLocal = threadRandom.get();
+        return (threadLocal != null) ? threadLocal : random;
+    }
 
     /* Helper for methods to assign indices to leaves */
     // private int runningLeafIndex;
@@ -896,7 +970,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
             setupCommonAncestorHeightsIfDirty();
         }
 
-        runningInnerIndex = this.getSizeOfLeavesArray();
+        runningInnerIndex.get()[0] = this.getSizeOfLeavesArray();
         Node root = getVertexBasedOnStrategy(this.rootClade, samplingStrategy, heightStrategy);
 
         if (this instanceof FilteredCCD) {
@@ -1019,7 +1093,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
     /** Returns and advances the running inner-node index used when materialising sampled trees. */
     protected int nextRunningInnerIndex() {
-        return runningInnerIndex++;
+        return runningInnerIndex.get()[0]++;
     }
 
     /* Helper method */
@@ -1070,7 +1144,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
 
                 // the sum of probabilities over all partitions of a clade
                 // should be 1, so we can sample with a random value
-                double sampleWithMe = random.nextDouble();
+                double sampleWithMe = random().nextDouble();
 
                 double probabilitySum = 0;
                 for (CladePartition nextPartition : partitions) {

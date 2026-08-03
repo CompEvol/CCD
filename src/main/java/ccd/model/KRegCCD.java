@@ -190,11 +190,17 @@ public class KRegCCD extends RegCCD {
 
     private SamplingFidelity samplingFidelity = SamplingFidelity.SELF_CONSISTENT;
 
-    /** Reservoir state for {@link #sampleBoundary}: count of valid boundaries seen so far. */
-    private int boundarySeen;
-    private double boundaryWeightSeen; // weighted-reservoir accumulator for FLAT boundary sampling
-    /** Reservoir state for {@link #sampleBoundary}: the boundary currently selected. */
-    private BitSet[] boundaryPick;
+    /**
+     * Reservoir state for one {@link #sampleBoundary} call: the number of valid boundaries seen so
+     * far (or their pathcount-weighted total, for {@link NovelMode#FLAT}) and the boundary
+     * currently selected. Held per call rather than per instance so that the concurrent draws in
+     * {@link #sampleTrees} each keep their own reservoir.
+     */
+    private static final class BoundaryReservoir {
+        int seen;
+        double weightSeen;
+        BitSet[] pick;
+    }
 
     /**
      * Strictly-positive fallback increment for novel-node heights when the region top is not
@@ -694,6 +700,14 @@ public class KRegCCD extends RegCCD {
         if (mapLogProbMemo != null) {
             return;
         }
+        // The DP below visits every clade and needs each one's reserve discount, so solve all the
+        // reserves up front in parallel instead of lazily inside the serial size-ordered loop --
+        // exactly as getEntropyRecursive does. Each computeReg is an O(m^2) disjoint-pair pass, so
+        // on large clade sets that lazy path, not the DP arithmetic, dominates getMAPTree, and it
+        // runs on one core. Same values either way (the reserve of a clade depends only on its own
+        // observed subclades), so this changes cost only, not the MAP tree.
+        precomputeReserves();
+
         Map<Clade, Double> logProb = new HashMap<>();
         Map<Clade, CladePartition> argmax = new HashMap<>();
         List<Clade> clades = new ArrayList<>(getClades());
@@ -1443,7 +1457,7 @@ public class KRegCCD extends RegCCD {
             for (double w : orderWeight) {
                 escapeMass += w;
             }
-            if (escapeMass > 0 && random.nextDouble() < escapeMass) {
+            if (escapeMass > 0 && random().nextDouble() < escapeMass) {
                 Node region = sampleBlueRegion(clade, reg, orderWeight, escapeMass, heightStrategy);
                 if (region != null) {
                     return region;
@@ -1520,7 +1534,7 @@ public class KRegCCD extends RegCCD {
      */
     private Node sampleBlueRegion(Clade c, CladeReg reg, double[] orderWeight, double escapeMass,
                                   HeightSettingStrategy heightStrategy) {
-        double target = random.nextDouble() * escapeMass;
+        double target = random().nextDouble() * escapeMass;
         double acc = 0.0;
         int m = -1;
         for (int mm = 3; mm < orderWeight.length; mm++) {
@@ -1584,17 +1598,15 @@ public class KRegCCD extends RegCCD {
      * enumeration {@link #countNj} counts. Returns the chosen parts, or {@code null} if none.
      */
     private BitSet[] sampleBoundary(Clade c, List<Clade> subs, int m) {
-        boundarySeen = 0;
-        boundaryWeightSeen = 0.0;
-        boundaryPick = null;
+        BoundaryReservoir reservoir = new BoundaryReservoir();
         enumOps.get()[0] = 0;
         sampleBoundaryWalk(c.getCladeInBits(), subs, m, 0,
-                BitSet.newBitSet(leafArraySize), new ArrayList<>(m));
-        return boundaryPick;
+                BitSet.newBitSet(leafArraySize), new ArrayList<>(m), reservoir);
+        return reservoir.pick;
     }
 
     private void sampleBoundaryWalk(BitSet cBits, List<Clade> subs, int m, int startIdx,
-                                    BitSet used, List<BitSet> chosen) {
+                                    BitSet used, List<BitSet> chosen, BoundaryReservoir reservoir) {
         if (++enumOps.get()[0] > opsBudget) {
             throw BUDGET_EXCEEDED;
         }
@@ -1619,14 +1631,14 @@ public class KRegCCD extends RegCCD {
             if (novelMode == NovelMode.FLAT) {
                 // FLAT samples a boundary in proportion to its pathcount (so that, with the
                 // uniform resolution pick below, every distinct novel tree is equiprobable).
-                boundaryWeightSeen += pc;
-                if (random.nextDouble() * boundaryWeightSeen < pc) { // weighted reservoir
-                    boundaryPick = parts;
+                reservoir.weightSeen += pc;
+                if (random().nextDouble() * reservoir.weightSeen < pc) { // weighted reservoir
+                    reservoir.pick = parts;
                 }
             } else {
-                boundarySeen++;
-                if (random.nextInt(boundarySeen) == 0) { // uniform reservoir: keep with prob 1/seen
-                    boundaryPick = parts;
+                reservoir.seen++;
+                if (random().nextInt(reservoir.seen) == 0) { // uniform reservoir: keep with prob 1/seen
+                    reservoir.pick = parts;
                 }
             }
             return;
@@ -1639,7 +1651,7 @@ public class KRegCCD extends RegCCD {
             chosen.add(pb);
             BitSet newUsed = (BitSet) used.clone();
             newUsed.or(pb);
-            sampleBoundaryWalk(cBits, subs, m, i + 1, newUsed, chosen);
+            sampleBoundaryWalk(cBits, subs, m, i + 1, newUsed, chosen, reservoir);
             chosen.remove(chosen.size() - 1);
         }
     }
@@ -1731,7 +1743,7 @@ public class KRegCCD extends RegCCD {
         }
         int low = mask & (-mask);
         int rest = mask ^ low;
-        int targetCount = random.nextInt(f[mask]); // f[mask] > 0 at every visited mask
+        int targetCount = random().nextInt(f[mask]); // f[mask] > 0 at every visited mask
         int acc = 0;
         int chosenS1 = -1;
         int chosenS2 = -1;
@@ -1917,6 +1929,16 @@ public class KRegCCD extends RegCCD {
      * paying that enumeration lazily — and unevenly — during the first samples. Idempotent (cache hits
      * after the first call). Useful before a large sampling loop (e.g. variational ELBO estimation).
      */
+    /**
+     * Solves every clade's reserve before {@link #sampleTrees} fans out, so the concurrent draws
+     * only read {@code regCache} instead of racing to fill it (and so the reserve cost is paid
+     * once, in parallel, rather than unevenly across the first draws).
+     */
+    @Override
+    protected void prepareForSampling() {
+        precomputeReserves();
+    }
+
     public void precomputeReserves() {
         // Clades are independent: each computeReg only reads immutable clade structure + writes its own
         // entry in the (concurrent) regCache, and the op-budget counter is thread-local. With tailMode
