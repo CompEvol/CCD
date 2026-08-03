@@ -229,7 +229,7 @@ public class KRegCCD extends RegCCD {
      * Default per-clade escape probability used when a tool builds a KRegCCD without
      * specifying one (e.g. via {@link CCDType#KRegCCD}); the RSV2 operating point.
      */
-    public static final double DEFAULT_MU = 0.01;
+    public static final double DEFAULT_MU = 0.005;
     /**
      * Default additive-smoothing pseudocount for the split-expanded backbone (shared with
      * {@link RegCCD}'s default).
