@@ -190,11 +190,17 @@ public class KRegCCD extends RegCCD {
 
     private SamplingFidelity samplingFidelity = SamplingFidelity.SELF_CONSISTENT;
 
-    /** Reservoir state for {@link #sampleBoundary}: count of valid boundaries seen so far. */
-    private int boundarySeen;
-    private double boundaryWeightSeen; // weighted-reservoir accumulator for FLAT boundary sampling
-    /** Reservoir state for {@link #sampleBoundary}: the boundary currently selected. */
-    private BitSet[] boundaryPick;
+    /**
+     * Reservoir state for one {@link #sampleBoundary} call: the number of valid boundaries seen so
+     * far (or their pathcount-weighted total, for {@link NovelMode#FLAT}) and the boundary
+     * currently selected. Held per call rather than per instance so that the concurrent draws in
+     * {@link #sampleTrees} each keep their own reservoir.
+     */
+    private static final class BoundaryReservoir {
+        int seen;
+        double weightSeen;
+        BitSet[] pick;
+    }
 
     /**
      * Strictly-positive fallback increment for novel-node heights when the region top is not
@@ -223,7 +229,7 @@ public class KRegCCD extends RegCCD {
      * Default per-clade escape probability used when a tool builds a KRegCCD without
      * specifying one (e.g. via {@link CCDType#KRegCCD}); the RSV2 operating point.
      */
-    public static final double DEFAULT_MU = 0.01;
+    public static final double DEFAULT_MU = 0.005;
     /**
      * Default additive-smoothing pseudocount for the split-expanded backbone (shared with
      * {@link RegCCD}'s default).
@@ -694,6 +700,14 @@ public class KRegCCD extends RegCCD {
         if (mapLogProbMemo != null) {
             return;
         }
+        // The DP below visits every clade and needs each one's reserve discount, so solve all the
+        // reserves up front in parallel instead of lazily inside the serial size-ordered loop --
+        // exactly as getEntropyRecursive does. Each computeReg is an O(m^2) disjoint-pair pass, so
+        // on large clade sets that lazy path, not the DP arithmetic, dominates getMAPTree, and it
+        // runs on one core. Same values either way (the reserve of a clade depends only on its own
+        // observed subclades), so this changes cost only, not the MAP tree.
+        precomputeReserves();
+
         Map<Clade, Double> logProb = new HashMap<>();
         Map<Clade, CladePartition> argmax = new HashMap<>();
         List<Clade> clades = new ArrayList<>(getClades());
@@ -889,13 +903,29 @@ public class KRegCCD extends RegCCD {
      * KRegCCD distribution
      */
     public double getEntropyRecursive() {
-        Map<Clade, Double> freeMemo = new HashMap<>();
-        Map<Clade, Double> redMemo = new HashMap<>();
-        List<Clade> clades = new ArrayList<>(getClades());
-        clades.sort((a, b) -> Integer.compare(a.size(), b.size()));
-        for (Clade c : clades) {
-            entropyRedForced(c, freeMemo, redMemo);
-            entropyFree(c, freeMemo, redMemo);
+        Map<Clade, Double> freeMemo = new ConcurrentHashMap<>();
+        Map<Clade, Double> redMemo = new ConcurrentHashMap<>();
+        // Both entropyRedForced(c) and entropyFree(c) read only strictly-smaller clades (a clade's
+        // partition children and its blue-region boundary parts are all smaller than it), so once
+        // every smaller size level is memoised, all clades of a given size are independent and can
+        // be computed in parallel -- exactly as precomputeReserves parallelises computeReg. Each
+        // task writes only its own clade's freeMemo/redMemo entries (a concurrent map), and the
+        // per-clade arithmetic is unchanged, so the entropy is identical to the serial computation.
+        List<List<Clade>> bySize = new ArrayList<>(leafArraySize + 1);
+        for (int s = 0; s <= leafArraySize; s++) {
+            bySize.add(new ArrayList<>());
+        }
+        for (Clade c : getClades()) {
+            bySize.get(c.size()).add(c);
+        }
+        for (int s = 1; s <= leafArraySize; s++) {
+            List<Clade> level = bySize.get(s);
+            if (!level.isEmpty()) {
+                level.parallelStream().forEach(c -> {
+                    entropyRedForced(c, freeMemo, redMemo);
+                    entropyFree(c, freeMemo, redMemo);
+                });
+            }
         }
         return freeMemo.getOrDefault(getRootClade(), 0.0);
     }
@@ -984,10 +1014,14 @@ public class KRegCCD extends RegCCD {
                                        Map<Clade, Double> freeMemo, Map<Clade, Double> redMemo) {
         List<Clade> subs = observedSubclades(c);
         BitSet cBits = c.getCladeInBits();
+        int lastBoundary = reg.lastBoundary();
         double[] acc = new double[2]; // [0] childEntropy, [1] extraLogPc (SHARED)
         enumOps.get()[0] = 0;
         try {
-            for (int m = 3; m <= reg.lastBoundary(); m++) {
+            // Orders 3 and 4 (the default reserve depth) via the fast sum-arithmetic pair pass.
+            blueContributionFast(subs, cBits, eps, lastBoundary, acc, freeMemo, redMemo);
+            // Deeper orders (only reached when boundaries 3 and 4 are both empty) keep the old walk.
+            for (int m = 5; m <= lastBoundary; m++) {
                 blueWalk(cBits, subs, m, 0, BitSet.newBitSet(leafArraySize), new ArrayList<>(m),
                         eps, acc, freeMemo, redMemo);
             }
@@ -995,6 +1029,159 @@ public class KRegCCD extends RegCCD {
             // deeper boundaries omitted (negligible, like the reserve tail); same guard as countNj
         }
         return new BlueTerms(acc[0], acc[1]);
+    }
+
+    /**
+     * Accumulates the blue-region entropy terms for boundary orders 3 and 4 in one disjoint-pair
+     * pass, the entropy counterpart of {@link #countN1N2}: it enumerates the same boundaries by
+     * weighted-sum complement lookups, but at each boundary adds {@code boundaryMass * sum of the
+     * boundary parts' forced-red entropy} to {@code acc[0]} (and, in SHARED mode, the per-region
+     * {@code eps^(m-2) * log pathcount} self-information to {@code acc[1]}). Emits exactly the same
+     * boundaries as the old {@link #blueWalk} for these orders.
+     */
+    private void blueContributionFast(List<Clade> subs, BitSet cBits, double eps, int lastBoundary,
+                                      double[] acc, Map<Clade, Double> freeMemo,
+                                      Map<Clade, Double> redMemo) {
+        int m = subs.size();
+        BitSet[] sb = new BitSet[m];
+        long[] partSum = new long[m];
+        int[] partCard = new int[m];
+        double[] redH = new double[m]; // forced-red entropy of each boundary part (memoised lookup)
+        for (int i = 0; i < m; i++) {
+            sb[i] = subs.get(i).getCladeInBits();
+            partSum[i] = weightedSum(sb[i]);
+            partCard[i] = sb[i].cardinality();
+            redH[i] = entropyRedForced(subs.get(i), freeMemo, redMemo);
+        }
+        long sumC = weightedSum(cBits);
+        int cardC = cBits.cardinality();
+        boolean flat = novelMode == NovelMode.FLAT;
+        double eps1 = eps;         // eps^(3-2)
+        double eps2 = eps * eps;   // eps^(4-2)
+        boolean do4 = lastBoundary >= 4;
+        final long[] ops = enumOps.get();
+
+        int stb = Integer.highestOneBit(Math.max(1, m)) << 1;
+        int smask = stb - 1;
+        int[] subHead = new int[stb];
+        java.util.Arrays.fill(subHead, -1);
+        int[] subNxt = new int[m];
+        for (int i = 0; i < m; i++) {
+            int b = mixHash(partSum[i]) & smask;
+            subNxt[i] = subHead[b];
+            subHead[b] = i;
+        }
+
+        int cap = 256, P = 0;
+        int[] ei = new int[cap], ej = new int[cap], eh = new int[cap];
+        long[] sU = new long[cap];
+        BitSet ue = BitSet.newBitSet(leafArraySize);
+        BitSet uf = BitSet.newBitSet(leafArraySize);
+        for (int i = 0; i < m; i++) {
+            BitSet a = sb[i];
+            for (int j = i + 1; j < m; j++) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                if (a.intersects(sb[j])) {
+                    continue;
+                }
+                long s = partSum[i] + partSum[j];
+                long sR = sumC - s;
+                boolean ueBuilt = false;
+                for (int d = subHead[mixHash(sR) & smask]; d >= 0; d = subNxt[d]) {
+                    if (d <= j || partSum[d] != sR) {
+                        continue;
+                    }
+                    if (partCard[i] + partCard[j] + partCard[d] != cardC) {
+                        continue;
+                    }
+                    if (!ueBuilt) {
+                        ue.clear();
+                        ue.or(a);
+                        ue.or(sb[j]);
+                        ueBuilt = true;
+                    }
+                    if (ue.intersects(sb[d])) {
+                        continue;
+                    }
+                    BitSet[] parts = {sb[i], sb[j], sb[d]};
+                    int pc = countAllNovelResolutions(cBits, parts);
+                    if (pc > 0) {
+                        double childH = redH[i] + redH[j] + redH[d];
+                        acc[0] += (flat ? pc * eps1 : eps1) * childH;
+                        if (!flat) {
+                            acc[1] += eps1 * Math.log(pc);
+                        }
+                    }
+                }
+                if (do4) {
+                    if (P == cap) {
+                        cap <<= 1;
+                        ei = java.util.Arrays.copyOf(ei, cap);
+                        ej = java.util.Arrays.copyOf(ej, cap);
+                        eh = java.util.Arrays.copyOf(eh, cap);
+                        sU = java.util.Arrays.copyOf(sU, cap);
+                    }
+                    ei[P] = i;
+                    ej[P] = j;
+                    sU[P] = s;
+                    eh[P] = mixHash(s);
+                    P++;
+                }
+            }
+        }
+        if (!do4 || P == 0) {
+            return;
+        }
+        int tb = Integer.highestOneBit(P) << 1;
+        int mask = tb - 1;
+        int[] head = new int[tb];
+        java.util.Arrays.fill(head, -1);
+        int[] nxt = new int[P];
+        for (int e = 0; e < P; e++) {
+            int b = eh[e] & mask;
+            nxt[e] = head[b];
+            head[b] = e;
+        }
+        for (int e = 0; e < P; e++) {
+            int i = ei[e], j = ej[e];
+            long sR = sumC - sU[e];
+            boolean ueBuilt = false;
+            for (int f = head[mixHash(sR) & mask]; f >= 0; f = nxt[f]) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                int k = ei[f], l = ej[f];
+                if (k <= j) {
+                    continue;
+                }
+                if (partCard[i] + partCard[j] + partCard[k] + partCard[l] != cardC) {
+                    continue;
+                }
+                if (!ueBuilt) {
+                    ue.clear();
+                    ue.or(sb[i]);
+                    ue.or(sb[j]);
+                    ueBuilt = true;
+                }
+                uf.clear();
+                uf.or(sb[k]);
+                uf.or(sb[l]);
+                if (ue.intersects(uf)) {
+                    continue;
+                }
+                BitSet[] parts = {sb[i], sb[j], sb[k], sb[l]};
+                int pc = countAllNovelResolutions(cBits, parts);
+                if (pc > 0) {
+                    double childH = redH[i] + redH[j] + redH[k] + redH[l];
+                    acc[0] += (flat ? pc * eps2 : eps2) * childH;
+                    if (!flat) {
+                        acc[1] += eps2 * Math.log(pc);
+                    }
+                }
+            }
+        }
     }
 
     private void blueWalk(BitSet cBits, List<Clade> subs, int m, int startIdx, BitSet used,
@@ -1270,7 +1457,7 @@ public class KRegCCD extends RegCCD {
             for (double w : orderWeight) {
                 escapeMass += w;
             }
-            if (escapeMass > 0 && random.nextDouble() < escapeMass) {
+            if (escapeMass > 0 && random().nextDouble() < escapeMass) {
                 Node region = sampleBlueRegion(clade, reg, orderWeight, escapeMass, heightStrategy);
                 if (region != null) {
                     return region;
@@ -1347,7 +1534,7 @@ public class KRegCCD extends RegCCD {
      */
     private Node sampleBlueRegion(Clade c, CladeReg reg, double[] orderWeight, double escapeMass,
                                   HeightSettingStrategy heightStrategy) {
-        double target = random.nextDouble() * escapeMass;
+        double target = random().nextDouble() * escapeMass;
         double acc = 0.0;
         int m = -1;
         for (int mm = 3; mm < orderWeight.length; mm++) {
@@ -1411,17 +1598,15 @@ public class KRegCCD extends RegCCD {
      * enumeration {@link #countNj} counts. Returns the chosen parts, or {@code null} if none.
      */
     private BitSet[] sampleBoundary(Clade c, List<Clade> subs, int m) {
-        boundarySeen = 0;
-        boundaryWeightSeen = 0.0;
-        boundaryPick = null;
+        BoundaryReservoir reservoir = new BoundaryReservoir();
         enumOps.get()[0] = 0;
         sampleBoundaryWalk(c.getCladeInBits(), subs, m, 0,
-                BitSet.newBitSet(leafArraySize), new ArrayList<>(m));
-        return boundaryPick;
+                BitSet.newBitSet(leafArraySize), new ArrayList<>(m), reservoir);
+        return reservoir.pick;
     }
 
     private void sampleBoundaryWalk(BitSet cBits, List<Clade> subs, int m, int startIdx,
-                                    BitSet used, List<BitSet> chosen) {
+                                    BitSet used, List<BitSet> chosen, BoundaryReservoir reservoir) {
         if (++enumOps.get()[0] > opsBudget) {
             throw BUDGET_EXCEEDED;
         }
@@ -1446,14 +1631,14 @@ public class KRegCCD extends RegCCD {
             if (novelMode == NovelMode.FLAT) {
                 // FLAT samples a boundary in proportion to its pathcount (so that, with the
                 // uniform resolution pick below, every distinct novel tree is equiprobable).
-                boundaryWeightSeen += pc;
-                if (random.nextDouble() * boundaryWeightSeen < pc) { // weighted reservoir
-                    boundaryPick = parts;
+                reservoir.weightSeen += pc;
+                if (random().nextDouble() * reservoir.weightSeen < pc) { // weighted reservoir
+                    reservoir.pick = parts;
                 }
             } else {
-                boundarySeen++;
-                if (random.nextInt(boundarySeen) == 0) { // uniform reservoir: keep with prob 1/seen
-                    boundaryPick = parts;
+                reservoir.seen++;
+                if (random().nextInt(reservoir.seen) == 0) { // uniform reservoir: keep with prob 1/seen
+                    reservoir.pick = parts;
                 }
             }
             return;
@@ -1466,7 +1651,7 @@ public class KRegCCD extends RegCCD {
             chosen.add(pb);
             BitSet newUsed = (BitSet) used.clone();
             newUsed.or(pb);
-            sampleBoundaryWalk(cBits, subs, m, i + 1, newUsed, chosen);
+            sampleBoundaryWalk(cBits, subs, m, i + 1, newUsed, chosen, reservoir);
             chosen.remove(chosen.size() - 1);
         }
     }
@@ -1558,7 +1743,7 @@ public class KRegCCD extends RegCCD {
         }
         int low = mask & (-mask);
         int rest = mask ^ low;
-        int targetCount = random.nextInt(f[mask]); // f[mask] > 0 at every visited mask
+        int targetCount = random().nextInt(f[mask]); // f[mask] > 0 at every visited mask
         int acc = 0;
         int chosenS1 = -1;
         int chosenS2 = -1;
@@ -1744,6 +1929,16 @@ public class KRegCCD extends RegCCD {
      * paying that enumeration lazily — and unevenly — during the first samples. Idempotent (cache hits
      * after the first call). Useful before a large sampling loop (e.g. variational ELBO estimation).
      */
+    /**
+     * Solves every clade's reserve before {@link #sampleTrees} fans out, so the concurrent draws
+     * only read {@code regCache} instead of racing to fill it (and so the reserve cost is paid
+     * once, in parallel, rather than unevenly across the first draws).
+     */
+    @Override
+    protected void prepareForSampling() {
+        precomputeReserves();
+    }
+
     public void precomputeReserves() {
         // Clades are independent: each computeReg only reads immutable clade structure + writes its own
         // entry in the (concurrent) regCache, and the op-budget counter is thread-local. With tailMode
@@ -1796,18 +1991,53 @@ public class KRegCCD extends RegCCD {
         int last = 2;
         boolean anyNonzero = false;
         enumOps.get()[0] = 0;
-        for (int j = 3; j <= c.size(); j++) {
-            if (j > reserveBoundary && anyNonzero) {
-                break; // reached reserve depth and have a usable (positive) reserve
-            }
+        if (reserveBoundary == 3 || reserveBoundary == 4) {
+            // Fast path for the practical reserve depths: k = 1 (N_1 only) or k = 2 (N_1 and N_2),
+            // sharing one weighted-sum disjoint-pair pass. N_2 is skipped entirely when k = 1.
+            boolean computeN2 = reserveBoundary == 4 && c.size() >= 4;
             try {
-                n[j] = countNj(c, subs, j, false); // accumulates enumOps across j
+                long[] n12 = countN1N2(c, subs, computeN2);
+                n[3] = (int) n12[0];
+                last = 3;
+                if (n[3] > 0) {
+                    anyNonzero = true;
+                }
+                if (computeN2) {
+                    n[4] = (int) n12[1];
+                    last = 4;
+                    if (n[4] > 0) {
+                        anyNonzero = true;
+                    }
+                }
             } catch (BudgetExceeded e) {
-                break;
+                // pathological pair blow-up: leave N_1/N_2 = 0 (same capped-out reserve as before)
             }
-            last = j;
-            if (n[j] > 0) {
-                anyNonzero = true;
+            // Only climb past the reserve depth if all computed orders were empty (keeps eps positive).
+            for (int j = last + 1; j <= c.size() && !anyNonzero; j++) {
+                try {
+                    n[j] = countNj(c, subs, j, false);
+                } catch (BudgetExceeded e) {
+                    break;
+                }
+                last = j;
+                if (n[j] > 0) {
+                    anyNonzero = true;
+                }
+            }
+        } else {
+            for (int j = 3; j <= c.size(); j++) {
+                if (j > reserveBoundary && anyNonzero) {
+                    break; // reached reserve depth and have a usable (positive) reserve
+                }
+                try {
+                    n[j] = countNj(c, subs, j, false); // accumulates enumOps across j
+                } catch (BudgetExceeded e) {
+                    break;
+                }
+                last = j;
+                if (n[j] > 0) {
+                    anyNonzero = true;
+                }
             }
         }
         double logEps = anyNonzero ? solveLogEps(n, last, mu) : Double.NEGATIVE_INFINITY;
@@ -1921,9 +2151,315 @@ public class KRegCCD extends RegCCD {
      * resolution. earlyExit returns 1 as soon as one is found. */
     private int countNj(Clade c, List<Clade> subs, int m, boolean earlyExit) {
         BitSet cBits = c.getCladeInBits();
+        if (m == 4) {
+            // Boundary-4 (N_2) dominates construction: the generic enumerate is O(m^3) (choose 3
+            // parts, derive the 4th as the complement), so on the big clades it burns the whole
+            // op-budget. A 4-part boundary is exactly two disjoint observed PAIRS whose unions are
+            // complementary within C, so we can meet in the middle: enumerate the O(m^2) disjoint
+            // pairs once, bucket them by their union bitset, then match each union U with C\U. This
+            // visits only combinations that actually tile C (no rejected triples) -- O(m^2) build
+            // plus one visit per valid boundary -- and returns exactly the same count as enumerate
+            // for both FLAT (sum of pathcounts) and SHARED (admissible-boundary indicator).
+            return countN2ViaPairs(cBits, subs, earlyExit);
+        }
         BitSet used = BitSet.newBitSet(leafArraySize);
         List<BitSet> chosen = new ArrayList<>(m);
         return enumerate(cBits, subs, m, 0, used, chosen, earlyExit);
+    }
+
+    /**
+     * Meet-in-the-middle count of boundary-4 (N_2) partitions of {@code cBits} into observed
+     * subclades (see {@link #countNj}). A 4-part boundary {@code P1<P2<P3<P4} is the pairing
+     * {P1,P2} | {P3,P4} of two disjoint observed pairs whose unions are complementary in C. We
+     * enumerate the O(m^2) disjoint observed pairs, then for each pair {@code (i,j)} look up the
+     * pairs {@code (k,l)} whose union is the complement {@code C∖union(i,j)} with {@code k > j}, so
+     * each boundary is emitted exactly once (indices {@code i<j<k<l}).
+     *
+     * <p>Complements are found by <em>weighted-sum arithmetic</em>, not bitset materialisation.
+     * {@link Clade#getCladeInBits()}'s {@code hashCode} weights word {@code w} by {@code w+1}, so
+     * {@code weightedSum} is additive over disjoint sets: a pair's union sum is the sum of its two
+     * parts' precomputed sums, and the complement's sum is {@code weightedSum(C) - union sum}. Pairs
+     * are hashed by that {@code long} sum (no per-pair union bitset or {@code hashCode}); a chain hit
+     * is confirmed <em>exactly</em> — cheaply and immune to sum wraparound — by the cardinality
+     * identity {@code |Pi| + |Pj| + |Pk| + |Pl| == |C|} together with disjointness, which for parts
+     * that are subclades of C is equivalent to tiling C. This is the dominant cost of building the
+     * reserves and is allocation-free per pair. Shares the per-clade {@link #enumOps}/{@link
+     * #opsBudget} guard with {@link #enumerate}, so a pathological clade still degrades gracefully to
+     * the same capped-out {@code N_2 = 0}.
+     */
+    private int countN2ViaPairs(BitSet cBits, List<Clade> subs, boolean earlyExit) {
+        int m = subs.size();
+        BitSet[] sb = new BitSet[m];
+        long[] partSum = new long[m];
+        int[] partCard = new int[m];
+        for (int i = 0; i < m; i++) {
+            sb[i] = subs.get(i).getCladeInBits();
+            partSum[i] = weightedSum(sb[i]);
+            partCard[i] = sb[i].cardinality();
+        }
+        long sumC = weightedSum(cBits);
+        int cardC = cBits.cardinality();
+        final long[] ops = enumOps.get();
+
+        // Enumerate disjoint observed pairs into flat arrays; entry e is pair (ei[e], ej[e]) with
+        // union weighted-sum sU[e]. No per-pair bitset is built (sums are added from the parts).
+        int cap = 256, P = 0;
+        int[] ei = new int[cap], ej = new int[cap], eh = new int[cap];
+        long[] sU = new long[cap];
+        for (int i = 0; i < m; i++) {
+            BitSet a = sb[i];
+            for (int j = i + 1; j < m; j++) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                if (a.intersects(sb[j])) {
+                    continue;
+                }
+                if (P == cap) {
+                    cap <<= 1;
+                    ei = java.util.Arrays.copyOf(ei, cap);
+                    ej = java.util.Arrays.copyOf(ej, cap);
+                    eh = java.util.Arrays.copyOf(eh, cap);
+                    sU = java.util.Arrays.copyOf(sU, cap);
+                }
+                long s = partSum[i] + partSum[j];
+                ei[P] = i;
+                ej[P] = j;
+                sU[P] = s;
+                eh[P] = mixHash(s);
+                P++;
+            }
+        }
+        if (P == 0) {
+            return 0;
+        }
+
+        // Chained open hash over the union sums, so a pair can be found by its complement's sum.
+        int tb = Integer.highestOneBit(P) << 1; // power of two in [P, 2P)
+        int mask = tb - 1;
+        int[] head = new int[tb];
+        java.util.Arrays.fill(head, -1);
+        int[] nxt = new int[P];
+        for (int e = 0; e < P; e++) {
+            int b = eh[e] & mask;
+            nxt[e] = head[b];
+            head[b] = e;
+        }
+
+        // For each pair (i,j) match pairs (k,l) with union sum == weightedSum(C∖union(i,j)) and k>j;
+        // confirm exactly with the cardinality/disjointness tiling test.
+        int count = 0;
+        BitSet ue = BitSet.newBitSet(leafArraySize);
+        BitSet uf = BitSet.newBitSet(leafArraySize);
+        for (int e = 0; e < P; e++) {
+            int i = ei[e], j = ej[e];
+            long sR = sumC - sU[e];
+            boolean ueBuilt = false;
+            for (int f = head[mixHash(sR) & mask]; f >= 0; f = nxt[f]) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                int k = ei[f], l = ej[f];
+                if (k <= j) {
+                    continue; // canonical i<j<k<l, so each boundary is counted once
+                }
+                if (partCard[i] + partCard[j] + partCard[k] + partCard[l] != cardC) {
+                    continue; // parts cannot tile C (also filters sum-hash collisions)
+                }
+                if (!ueBuilt) {
+                    ue.clear();
+                    ue.or(sb[i]);
+                    ue.or(sb[j]);
+                    ueBuilt = true;
+                }
+                uf.clear();
+                uf.or(sb[k]);
+                uf.or(sb[l]);
+                if (ue.intersects(uf)) {
+                    continue; // disjoint + matching cardinality  <=>  the four parts tile C exactly
+                }
+                BitSet[] parts = {sb[i], sb[j], sb[k], sb[l]};
+                int res = countAllNovelResolutions(cBits, parts);
+                if (res > 0) {
+                    count += (novelMode == NovelMode.FLAT) ? res : 1;
+                    if (earlyExit) {
+                        return count;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Computes the boundary-3 ({@code N_1}) and boundary-4 ({@code N_2}) counts of {@code c}
+     * together in a <em>single</em> disjoint-observed-pair pass (returns {@code {N_1, N_2}}). This is
+     * the default reserve depth (k = 2) and by far the hottest part of building the reserves, so the
+     * two orders share the one O(m^2) pair enumeration instead of scanning it twice.
+     *
+     * <p>Both boundaries are matched by weighted-sum arithmetic (see {@link #countN2ViaPairs}): for a
+     * disjoint pair {@code (i,j)} the boundary-3 complement is the single observed subclade whose
+     * {@code weightedSum} equals {@code weightedSum(C) - union sum} (looked up in a sum-keyed hash of
+     * the subclades), and the boundary-4 complement is another disjoint pair with that sum. Every hit
+     * is confirmed exactly with the cardinality/disjointness tiling test, so sum collisions and
+     * wraparound are harmless. Honours the same {@link #enumOps}/{@link #opsBudget} guard.
+     *
+     * @param computeN2 when {@code false} (reserve depth k = 1, {@code eps} from {@code N_1} alone)
+     *                  the boundary-4 stash and match are skipped and {@code N_2} is returned as 0.
+     */
+    private long[] countN1N2(Clade c, List<Clade> subs, boolean computeN2) {
+        int m = subs.size();
+        BitSet[] sb = new BitSet[m];
+        long[] partSum = new long[m];
+        int[] partCard = new int[m];
+        for (int i = 0; i < m; i++) {
+            sb[i] = subs.get(i).getCladeInBits();
+            partSum[i] = weightedSum(sb[i]);
+            partCard[i] = sb[i].cardinality();
+        }
+        BitSet cBits = c.getCladeInBits();
+        long sumC = weightedSum(cBits);
+        int cardC = c.size();
+        final long[] ops = enumOps.get();
+
+        // Sum-keyed chained hash of the subclades, for the boundary-3 complement (a single subclade).
+        int stb = Integer.highestOneBit(Math.max(1, m)) << 1;
+        int smask = stb - 1;
+        int[] subHead = new int[stb];
+        java.util.Arrays.fill(subHead, -1);
+        int[] subNxt = new int[m];
+        for (int i = 0; i < m; i++) {
+            int b = mixHash(partSum[i]) & smask;
+            subNxt[i] = subHead[b];
+            subHead[b] = i;
+        }
+
+        // One disjoint-pair pass: score boundary-3 inline, stash pairs for the boundary-4 match.
+        long n1 = 0;
+        int cap = 256, P = 0;
+        int[] ei = new int[cap], ej = new int[cap], eh = new int[cap];
+        long[] sU = new long[cap];
+        BitSet ue = BitSet.newBitSet(leafArraySize);
+        BitSet uf = BitSet.newBitSet(leafArraySize);
+        for (int i = 0; i < m; i++) {
+            BitSet a = sb[i];
+            for (int j = i + 1; j < m; j++) {
+                if (++ops[0] > opsBudget) {
+                    throw BUDGET_EXCEEDED;
+                }
+                if (a.intersects(sb[j])) {
+                    continue;
+                }
+                long s = partSum[i] + partSum[j];
+                long sR = sumC - s;
+                // boundary-3: complement is one observed subclade d, canonical d > j
+                boolean ueBuilt = false;
+                for (int d = subHead[mixHash(sR) & smask]; d >= 0; d = subNxt[d]) {
+                    if (d <= j || partSum[d] != sR) {
+                        continue;
+                    }
+                    if (partCard[i] + partCard[j] + partCard[d] != cardC) {
+                        continue;
+                    }
+                    if (!ueBuilt) {
+                        ue.clear();
+                        ue.or(a);
+                        ue.or(sb[j]);
+                        ueBuilt = true;
+                    }
+                    if (ue.intersects(sb[d])) {
+                        continue;
+                    }
+                    BitSet[] parts = {sb[i], sb[j], sb[d]};
+                    int res = countAllNovelResolutions(cBits, parts);
+                    if (res > 0) {
+                        n1 += (novelMode == NovelMode.FLAT) ? res : 1;
+                    }
+                }
+                if (computeN2) {
+                    if (P == cap) {
+                        cap <<= 1;
+                        ei = java.util.Arrays.copyOf(ei, cap);
+                        ej = java.util.Arrays.copyOf(ej, cap);
+                        eh = java.util.Arrays.copyOf(eh, cap);
+                        sU = java.util.Arrays.copyOf(sU, cap);
+                    }
+                    ei[P] = i;
+                    ej[P] = j;
+                    sU[P] = s;
+                    eh[P] = mixHash(s);
+                    P++;
+                }
+            }
+        }
+
+        // boundary-4: match each pair with the pair whose union sum is the complement's, k > j.
+        long n2 = 0;
+        if (computeN2 && P > 0) {
+            int tb = Integer.highestOneBit(P) << 1;
+            int mask = tb - 1;
+            int[] head = new int[tb];
+            java.util.Arrays.fill(head, -1);
+            int[] nxt = new int[P];
+            for (int e = 0; e < P; e++) {
+                int b = eh[e] & mask;
+                nxt[e] = head[b];
+                head[b] = e;
+            }
+            for (int e = 0; e < P; e++) {
+                int i = ei[e], j = ej[e];
+                long sR = sumC - sU[e];
+                boolean ueBuilt = false;
+                for (int f = head[mixHash(sR) & mask]; f >= 0; f = nxt[f]) {
+                    if (++ops[0] > opsBudget) {
+                        throw BUDGET_EXCEEDED;
+                    }
+                    int k = ei[f], l = ej[f];
+                    if (k <= j) {
+                        continue;
+                    }
+                    if (partCard[i] + partCard[j] + partCard[k] + partCard[l] != cardC) {
+                        continue;
+                    }
+                    if (!ueBuilt) {
+                        ue.clear();
+                        ue.or(sb[i]);
+                        ue.or(sb[j]);
+                        ueBuilt = true;
+                    }
+                    uf.clear();
+                    uf.or(sb[k]);
+                    uf.or(sb[l]);
+                    if (ue.intersects(uf)) {
+                        continue;
+                    }
+                    BitSet[] parts = {sb[i], sb[j], sb[k], sb[l]};
+                    int res = countAllNovelResolutions(cBits, parts);
+                    if (res > 0) {
+                        n2 += (novelMode == NovelMode.FLAT) ? res : 1;
+                    }
+                }
+            }
+        }
+        return new long[]{n1, n2};
+    }
+
+    /** Weighted bit-sum matching {@link Clade#getCladeInBits()}'s {@code hashCode} word weighting
+     *  (word {@code w} weighted by {@code w+1}); additive over disjoint sets, so it lets the
+     *  boundary matcher find a pair's complement by {@code long} arithmetic. Wraparound mod 2^64 is
+     *  harmless — the matcher confirms hits with an exact cardinality/disjointness test. */
+    private static long weightedSum(BitSet b) {
+        long s = 0;
+        for (int bit = b.nextSetBit(0); bit >= 0; bit = b.nextSetBit(bit + 1)) {
+            s += ((long) ((bit >>> 6) + 1)) << (bit & 63);
+        }
+        return s;
+    }
+
+    /** Scalar mixer spreading a {@code long} union sum to a hash-table bucket. */
+    private static int mixHash(long x) {
+        long z = x * 0x9E3779B97F4A7C15L;
+        return (int) (z ^ (z >>> 32));
     }
 
     /* Recursive canonical enumeration: pick (m-1) parts at strictly increasing
