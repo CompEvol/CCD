@@ -92,6 +92,11 @@ public class SubtreeMarginal extends Runnable {
             "if > 0, subsample the posterior down to this many trees (uniformly) before analysis", 0);
     final public Input<Long> seedInput = new Input<>("seed",
             "random seed (subset choice and model sampling)");
+    final public Input<Integer> minSubsetsInput = new Input<>("minSubsets",
+            "minimum number of informative subsets (ones where the posterior itself spreads over "
+                    + "more than one induced shape) required before the CCD models are built and "
+                    + "sampled. Guards against spending hours on a posterior with too little "
+                    + "topological uncertainty to measure; set to 0 to force the run", 1);
 
     // Distribution column indices in the per-shape count arrays.
     private static final int EMP = 0, EMP_H1 = 1, EMP_H2 = 2, CCD0 = 3, CCD1 = 4, REGCCD = 5;
@@ -139,19 +144,18 @@ public class SubtreeMarginal extends Runnable {
         Collections.sort(taxa);
         Log.info.println("    taxa:        " + taxa.size());
 
-        // Build the models (unless in empirical-only calibration or exact mode).
+        // Model construction is deferred until after the empirical tally, so that a posterior with
+        // no topological uncertainty can be detected and the (expensive) model work skipped -- see
+        // the pre-flight check below. Their RNG seeds are drawn HERE, at the point in the sequence
+        // where the models used to be built, so that deferring construction leaves subset selection
+        // and model sampling bit-identical to before.
         AbstractCCD ccd0 = null, ccd1 = null, regccd = null;
-        if (modelsInput.get() && !exactInput.get()) {
-            Log.info.println("> building models...");
-            ccd0 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD0);
-            ccd1 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD1);
-            Log.info.println("    selecting regCCD (KRegCCD) parameters by " + foldsInput.get()
-                    + "-fold cross-validation...");
-            regccd = KRegCCD.withOptimisedParameters(posterior, foldsInput.get());
-            Log.info.println("    " + regccd);
-            ccd0.setRandom(new Random(random.nextLong()));
-            ccd1.setRandom(new Random(random.nextLong()));
-            regccd.setRandom(new Random(random.nextLong()));
+        final boolean wantModels = modelsInput.get() && !exactInput.get();
+        long ccd0Seed = 0, ccd1Seed = 0, regccdSeed = 0;
+        if (wantModels) {
+            ccd0Seed = random.nextLong();
+            ccd1Seed = random.nextLong();
+            regccdSeed = random.nextLong();
         } else {
             Log.info.println("> empirical-only calibration mode (no CCD models built)");
         }
@@ -204,8 +208,55 @@ public class SubtreeMarginal extends Runnable {
         totals[EMP_H1] = (posterior.size() + 1) / 2;
         totals[EMP_H2] = posterior.size() / 2;
 
+        // Pre-flight: a subset carries signal only if the POSTERIOR itself spreads over more than
+        // one induced shape. If the posterior is (near-)certain at this k, every subset is a point
+        // mass, the downstream analysis discards all of them, and the model work -- regCCD
+        // parameter selection plus three 50k-tree sampling runs, hours on a large dataset -- would
+        // produce a table with nothing in it. Check before paying for it. (Encountered on
+        // tornabene-2016: 1801 posterior trees, all the SAME topology, so 0 of 1000 subsets were
+        // usable at k=4 and no larger k would have helped either.)
+        int nonDegenerate = 0;
+        for (Map<String, double[]> c : counts) {
+            int shapesSeen = 0;
+            for (double[] v : c.values()) {
+                if (v[EMP] > 0) {
+                    shapesSeen++;
+                }
+            }
+            if (shapesSeen >= 2) {
+                nonDegenerate++;
+            }
+        }
+        Log.info.println("    distinct posterior topologies: " + countDistinctTopologies(posterior)
+                + " of " + posterior.size() + " trees");
+        Log.info.println("    informative subsets (posterior spreads over >1 shape): "
+                + nonDegenerate + " / " + n);
+
+        boolean buildModels = wantModels;
+        if (wantModels && nonDegenerate < minSubsetsInput.get()) {
+            Log.warning("SKIPPING the model comparison: only " + nonDegenerate + " of " + n
+                    + " subsets are informative (need >= " + minSubsetsInput.get() + ").");
+            Log.warning("The posterior has too little topological uncertainty at this k for the "
+                    + "induced-subtree comparison to measure anything. Writing the empirical "
+                    + "columns only; model columns will be 0. Raise -minSubsets to force the run.");
+            buildModels = false;
+        }
+
+        if (buildModels) {
+            Log.info.println("> building models...");
+            ccd0 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD0);
+            ccd1 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD1);
+            Log.info.println("    selecting regCCD (KRegCCD) parameters by " + foldsInput.get()
+                    + "-fold cross-validation...");
+            regccd = KRegCCD.withOptimisedParameters(posterior, foldsInput.get());
+            Log.info.println("    " + regccd);
+            ccd0.setRandom(new Random(ccd0Seed));
+            ccd1.setRandom(new Random(ccd1Seed));
+            regccd.setRandom(new Random(regccdSeed));
+        }
+
         // Model side: sample from each CCD and restrict.
-        if (modelsInput.get()) {
+        if (buildModels) {
             tallyModel(ccd0, CCD0, sampleSizeInput.get(), subsets, counts, "CCD0");
             tallyModel(ccd1, CCD1, sampleSizeInput.get(), subsets, counts, "CCD1");
             tallyModel(regccd, REGCCD, sampleSizeInput.get(), subsets, counts, "regCCD");
@@ -235,6 +286,37 @@ public class SubtreeMarginal extends Runnable {
             }
         }
         Log.info.println("... done.");
+    }
+
+    /**
+     * Number of distinct topologies in the sample, ignoring branch lengths: a one-line diagnostic
+     * for why a posterior yielded few informative subsets. A value of 1 means the chain returned a
+     * single tree, in which case no choice of k can give this comparison anything to measure.
+     */
+    private static int countDistinctTopologies(List<Tree> posterior) {
+        Set<String> seen = new HashSet<>();
+        for (Tree t : posterior) {
+            List<String> clades = new ArrayList<>();
+            collectClades(t.getRoot(), clades);
+            Collections.sort(clades);
+            seen.add(String.join("|", clades));
+        }
+        return seen.size();
+    }
+
+    /** Appends a canonical string for every internal clade of the subtree at {@code v}. */
+    private static List<Integer> collectClades(Node v, List<String> out) {
+        List<Integer> taxa = new ArrayList<>();
+        if (v.isLeaf()) {
+            taxa.add(v.getNr());
+        } else {
+            for (Node child : v.getChildren()) {
+                taxa.addAll(collectClades(child, out));
+            }
+            Collections.sort(taxa);
+            out.add(taxa.toString());
+        }
+        return taxa;
     }
 
     /** Sample {@code length} trees from the distribution and tally induced shapes per subset. */
