@@ -23,7 +23,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import ccd.algorithms.LoadOrStoreTrees;
 import ccd.model.AbstractCCD;
+import ccd.model.CCD0;
+import ccd.model.CCD1;
 import ccd.model.CCDType;
 import ccd.model.Clade;
 import ccd.model.CladePartition;
@@ -89,7 +92,18 @@ public class SubtreeMarginal extends Runnable {
                     + "clade DAG) instead of sampling; gives true coverage-miss (regCCD is 0 by the "
                     + "full-coverage theorem). Overrides -models.", false);
     final public Input<Integer> maxTreesInput = new Input<>("maxTrees",
-            "if > 0, subsample the posterior down to this many trees (uniformly) before analysis", 0);
+            "if > 0, thin the post-burn-in chain evenly down to this many trees. Applied while "
+                    + "reading, so only the kept trees are ever parsed or held in memory -- the "
+                    + "whole point on files too large to materialise (a 441-taxon, 36k-tree set "
+                    + "exhausts a 40 GB heap otherwise). All three models are then built from this "
+                    + "same subsample", 0);
+    final public Input<Integer> reserveDepthInput = new Input<>("reserveDepth",
+            "reserve depth k for regCCD, used for both the cross-validated parameter search and the "
+                    + "fitted model. k = 2 (the default) solves eps from N_1 and N_2; k = 1 skips the "
+                    + "boundary-4 match, which is where nearly all the cost is on large clade sets -- "
+                    + "at 441 taxa the default did not complete one CV fold in 11 h of CPU. k = 1 shifts eps "
+                    + "by a few percent, so results are not strictly comparable across depths",
+            KRegCCD.DEFAULT_RESERVE_DEPTH);
     final public Input<Long> seedInput = new Input<>("seed",
             "random seed (subset choice and model sampling)");
     final public Input<Integer> minSubsetsInput = new Input<>("minSubsets",
@@ -120,20 +134,23 @@ public class SubtreeMarginal extends Runnable {
         Log.info.println("    #samples:    " + sampleSizeInput.get());
         Log.info.println("    seed:        " + seed);
 
-        // Load the posterior sample.
-        TreeAnnotator.MemoryFriendlyTreeSet treeSet =
-                CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get());
-        List<Tree> posterior = CCDToolUtil.treesFromSet(treeSet);
+        // Load the posterior sample. With -maxTrees the thinning happens DURING the read, so only
+        // the kept trees are parsed and retained: materialising a large posterior first and
+        // subsampling afterwards defeats the purpose, and on the biggest sets it simply runs out
+        // of heap before it can get there.
+        List<Tree> posterior;
+        if (maxTreesInput.get() > 0) {
+            posterior = LoadOrStoreTrees.loadTrees(treeInput.get(),
+                    burnInPercentageInput.get() / 100.0, maxTreesInput.get());
+            Log.info.println("    posterior:   " + posterior.size()
+                    + " trees (evenly thinned over the post-burn-in chain)");
+        } else {
+            posterior = CCDToolUtil.treesFromSet(
+                    CCDToolUtil.getTreeSet(treeInput, burnInPercentageInput.get()));
+            Log.info.println("    posterior:   " + posterior.size() + " trees");
+        }
         if (posterior.isEmpty()) {
             throw new IllegalArgumentException("No trees left after burn-in.");
-        }
-        Log.info.println("    posterior:   " + posterior.size() + " trees");
-
-        // Optionally subsample the posterior (uniformly) for a faster calibration pass.
-        if (maxTreesInput.get() > 0 && posterior.size() > maxTreesInput.get()) {
-            Collections.shuffle(posterior, random);
-            posterior = new ArrayList<>(posterior.subList(0, maxTreesInput.get()));
-            Log.info.println("    subsampled:  " + posterior.size() + " trees");
         }
 
         // Taxon names from the first tree.
@@ -173,7 +190,7 @@ public class SubtreeMarginal extends Runnable {
         Log.info.println("    subsets:     " + subsets.size());
 
         if (exactInput.get()) {
-            runExact(treeSet, posterior, subsets);
+            runExact(posterior, subsets);
             return;
         }
 
@@ -244,11 +261,14 @@ public class SubtreeMarginal extends Runnable {
 
         if (buildModels) {
             Log.info.println("> building models...");
-            ccd0 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD0);
-            ccd1 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD1);
+            // Built from the same tree list as regCCD, so that under -maxTrees all three models
+            // see the identical subsample (the tree set would have re-read the whole file).
+            ccd0 = new CCD0(posterior, 0.0);
+            ccd1 = new CCD1(posterior, 0.0);
             Log.info.println("    selecting regCCD (KRegCCD) parameters by " + foldsInput.get()
                     + "-fold cross-validation...");
-            regccd = KRegCCD.withOptimisedParameters(posterior, foldsInput.get());
+            regccd = KRegCCD.withOptimisedParameters(posterior, foldsInput.get(),
+                    reserveDepthInput.get());
             Log.info.println("    " + regccd);
             ccd0.setRandom(new Random(ccd0Seed));
             ccd1.setRandom(new Random(ccd1Seed));
@@ -431,11 +451,10 @@ public class SubtreeMarginal extends Runnable {
      * where the mass columns are the total CCD probability on the subset's observed shapes, so the
      * analysis can form exact TV via the tail term (1 - massObs).
      */
-    private void runExact(TreeAnnotator.MemoryFriendlyTreeSet treeSet, List<Tree> posterior,
-                          List<Subset> subsets) throws Exception {
+    private void runExact(List<Tree> posterior, List<Subset> subsets) throws Exception {
         Log.info.println("> exact induced-probability mode (CCD0, CCD1)");
-        AbstractCCD ccd0 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD0);
-        AbstractCCD ccd1 = CCDToolUtil.getCCDTypeByName(treeSet, CCDType.CCD1);
+        AbstractCCD ccd0 = new CCD0(posterior, 0.0);
+        AbstractCCD ccd1 = new CCD1(posterior, 0.0);
         String[] taxaNames = ccd1.getSomeBaseTree().getTaxaNames();
         Map<String, Integer> nameToIdx = new HashMap<>();
         for (int i = 0; i < taxaNames.length; i++) {

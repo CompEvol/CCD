@@ -56,7 +56,7 @@ public class KRegCCDParameterOptimiser {
     /** Default number of cross-validation folds. */
     public static final int DEFAULT_FOLDS = 5;
 
-    /** Reserve depth used for the candidate models (matches {@link KRegCCD#DEFAULT_RESERVE_DEPTH}). */
+    /** Default reserve depth for the candidate models (matches {@link KRegCCD#DEFAULT_RESERVE_DEPTH}). */
     private static final int RESERVE_DEPTH = KRegCCD.DEFAULT_RESERVE_DEPTH;
 
     /* alpha search interval (strictly positive; mirrors RegCCDParameterOptimiser's range). */
@@ -102,6 +102,18 @@ public class KRegCCDParameterOptimiser {
     }
 
     public static Params optimise(List<Tree> trees, int folds, FoldAssignment assignment) {
+        return optimise(trees, folds, assignment, RESERVE_DEPTH);
+    }
+
+    /**
+     * As {@link #optimise(List, int, FoldAssignment)} but with an explicit reserve depth {@code k}.
+     * The per-clade reserve solve dominates cross-validation on large clade sets, and almost all of
+     * it is the boundary-4 (N_2) match that {@code k = 1} skips outright -- on a 441-taxon set the
+     * default k = 2 did not finish a single fold in 11 h of CPU. k = 1 solves eps from N_1 alone, which
+     * shifts eps by a few percent, so prefer the default unless the search is otherwise intractable.
+     */
+    public static Params optimise(List<Tree> trees, int folds, FoldAssignment assignment,
+                                  int reserveDepth) {
         int n = trees.size();
         if (n < 2) {
             throw new IllegalArgumentException("need at least 2 trees to cross-validate, got " + n);
@@ -133,7 +145,7 @@ public class KRegCCDParameterOptimiser {
             alphaStar = FIXED_ALPHA;
         } else {
             UnivariateFunction profiled = alpha -> {
-                double[] best = bestMuLogProb(trainByFold, testByFold, alpha, muGrid);
+                double[] best = bestMuLogProb(trainByFold, testByFold, alpha, muGrid, reserveDepth);
                 System.out.println(String.format(
                         "  testing alpha = %.5f -> best mu = %.5f, held-out logP = %.5f",
                         alpha, best[0], best[1]));
@@ -149,7 +161,7 @@ public class KRegCCDParameterOptimiser {
             alphaStar = sol.getPoint();
         }
 
-        double[] best = bestMuLogProb(trainByFold, testByFold, alphaStar, muGrid);
+        double[] best = bestMuLogProb(trainByFold, testByFold, alphaStar, muGrid, reserveDepth);
         System.out.println(String.format(
                 "KRegCCD optimised: alpha = %.5f, mu = %.5f, held-out logP = %.5f",
                 alphaStar, best[0], best[1]));
@@ -190,7 +202,7 @@ public class KRegCCDParameterOptimiser {
             testByFold.add(test);
         }
         double[] muGrid = logspace(MU_LO, MU_HI, MU_GRID);
-        double[] best = bestMuLogProb(trainByFold, testByFold, alpha, muGrid);
+        double[] best = bestMuLogProb(trainByFold, testByFold, alpha, muGrid, RESERVE_DEPTH);
         return new MuResult(best[0], best[1]);
     }
 
@@ -232,13 +244,19 @@ public class KRegCCDParameterOptimiser {
      * the same backbones — {@code mu} only re-solves {@code eps} from the cached counts.
      */
     private static double[] bestMuLogProb(List<List<Tree>> trainByFold, List<List<Tree>> testByFold,
-                                          double alpha, double[] muGrid) {
+                                          double alpha, double[] muGrid, int reserveDepth) {
         int b = trainByFold.size();
         KRegCCD[] models = new KRegCCD[b];
         for (int f = 0; f < b; f++) {
             // mu here is a placeholder: scoring overrides it via getLogProbabilityOfTree(tree, mu).
             models[f] = new KRegCCD(trainByFold.get(f), 0.0, KRegCCD.DEFAULT_MU, alpha,
-                    RESERVE_DEPTH, KRegCCD.TailMode.NONE);
+                    reserveDepth, KRegCCD.TailMode.NONE);
+            // Solve the reserves up front, in parallel. Scoring the held-out trees would otherwise
+            // fill regCache lazily on one thread during the first mu of the grid, and that solve --
+            // not the scoring arithmetic -- is what dominates on a large clade set. Same values
+            // either way (a clade's reserve depends only on its own observed subclades, and the
+            // N_j counts are mu-independent), so this changes cost only.
+            models[f].precomputeReserves();
         }
         double bestMu = muGrid[0];
         double bestLogProb = Double.NEGATIVE_INFINITY;
