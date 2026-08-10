@@ -47,7 +47,6 @@
         <beast.main>beast.base.minimal.BeastMain</beast.main>
         <beast.args/>
         <beast.pkg.name>CCD</beast.pkg.name>
-        <beast.pkg.version>1.2.0</beast.pkg.version>
     </properties>
 
     <dependencies>
@@ -194,7 +193,7 @@
                     <descriptors>
                         <descriptor>src/assembly/beast-package.xml</descriptor>
                     </descriptors>
-                    <finalName>${beast.pkg.name}.v${beast.pkg.version}</finalName>
+                    <finalName>${beast.pkg.name}.v${project.version}</finalName>
                     <appendAssemblyId>false</appendAssemblyId>
                 </configuration>
                 <executions>
