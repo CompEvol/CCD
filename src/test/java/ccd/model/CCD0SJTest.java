@@ -1,10 +1,7 @@
-package test.ccd.model;
+package ccd.model;
 
-import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
-import beastfx.app.inputeditor.BeautiPanelConfig;
-import ccd.model.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

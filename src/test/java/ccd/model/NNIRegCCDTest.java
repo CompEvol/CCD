@@ -1,12 +1,8 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import ccd.algorithms.NNICladeExpansion.PairingMode;
-import ccd.model.Clade;
-import ccd.model.CladePartition;
-import ccd.model.NNIRegCCD;
-import ccd.model.RegCCD;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

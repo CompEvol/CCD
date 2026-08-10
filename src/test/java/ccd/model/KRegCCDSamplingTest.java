@@ -1,11 +1,8 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Node;
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
-import ccd.model.AbstractCCD;
-import ccd.model.HeightSettingStrategy;
-import ccd.model.KRegCCD;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
