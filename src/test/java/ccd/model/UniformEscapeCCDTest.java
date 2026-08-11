@@ -1,8 +1,7 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
-import ccd.model.UniformEscapeCCD;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

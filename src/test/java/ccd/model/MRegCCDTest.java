@@ -1,11 +1,7 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
-import ccd.model.CCD0;
-import ccd.model.Clade;
-import ccd.model.CladePartition;
-import ccd.model.MRegCCD;
 import ccd.model.bitsets.BitSet;
 import org.junit.jupiter.api.Test;
 

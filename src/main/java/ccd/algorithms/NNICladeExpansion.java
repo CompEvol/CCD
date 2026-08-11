@@ -120,6 +120,17 @@ public class NNICladeExpansion {
     private long candidatesAlreadyPresent = 0;
     private boolean computed = false;
 
+    /**
+     * Parent-probability gate: a parent clade whose marginal probability is at
+     * or above this threshold is not expanded, on the premise that a near-certain
+     * parent has no alternative resolution worth adding. The default
+     * {@link Double#POSITIVE_INFINITY} disables the gate (full expansion). Setting
+     * 1.0 skips only fully-supported parents; lower values prune more. Benchmark
+     * (Remco): 1.0 is strictly lossless yet ~halves the novel-clade count, and
+     * 0.99 prunes further for a ~0.02% loss in recovered probability mass.
+     */
+    private double parentProbabilityThreshold = Double.POSITIVE_INFINITY;
+
     /** Taxa-only bits of every clade in the CCD, for fast presence tests. */
     private Set<BitSet> existingTaxa;
 
@@ -132,10 +143,40 @@ public class NNICladeExpansion {
         this.mode = mode;
     }
 
+    /**
+     * Sets the parent-probability gate: parent clades whose marginal probability
+     * is {@code >= threshold} are not expanded. Use
+     * {@link Double#POSITIVE_INFINITY} (the default) for full expansion. Must be
+     * called before {@link #compute()}.
+     *
+     * @param threshold parent-probability cutoff (skip a parent if its
+     *                  probability is at or above this value)
+     * @return this, for chaining
+     */
+    public NNICladeExpansion setParentProbabilityThreshold(double threshold) {
+        if (computed) {
+            throw new IllegalStateException(
+                    "setParentProbabilityThreshold must be called before compute()");
+        }
+        this.parentProbabilityThreshold = threshold;
+        return this;
+    }
+
+    /** @return the parent-probability gate (parents with prob &gt;= this are skipped). */
+    public double getParentProbabilityThreshold() {
+        return parentProbabilityThreshold;
+    }
+
     /** Runs the expansion if not already done; idempotent. */
     public NNICladeExpansion compute() {
         if (computed) {
             return this;
+        }
+
+        // the parent-probability gate reads Clade#getProbability(), which is
+        // computed lazily and otherwise defaults to -1; populate it when gating
+        if (parentProbabilityThreshold < Double.POSITIVE_INFINITY) {
+            ccd.computeCladeProbabilitiesIfDirty();
         }
 
         existingTaxa = new HashSet<>(ccd.getNumberOfClades() * 2);
@@ -158,6 +199,10 @@ public class NNICladeExpansion {
         for (Clade parent : ccd.getClades()) {
             // need at least 3 taxa to have a (cherry-or-larger child) + sibling
             if (parent.size() < 3) {
+                continue;
+            }
+            // skip near-certain parents: a stable parent yields no novel resolution
+            if (parent.getProbability() >= parentProbabilityThreshold) {
                 continue;
             }
             for (CladePartition split : parent.getPartitions()) {
@@ -226,12 +271,15 @@ public class NNICladeExpansion {
             Node left = children.get(0);
             Node right = children.get(1);
             Clade parent = map.get(vertex);
-            // edge above an internal child = NNI site; the other child is the sibling
-            if (!left.isLeaf()) {
-                recombineAt(parent, left, right, map);
-            }
-            if (!right.isLeaf()) {
-                recombineAt(parent, right, left, map);
+            // skip near-certain parents: a stable parent yields no novel resolution
+            if (parent.getProbability() < parentProbabilityThreshold) {
+                // edge above an internal child = NNI site; the other child is the sibling
+                if (!left.isLeaf()) {
+                    recombineAt(parent, left, right, map);
+                }
+                if (!right.isLeaf()) {
+                    recombineAt(parent, right, left, map);
+                }
             }
         }
         for (Node child : children) {

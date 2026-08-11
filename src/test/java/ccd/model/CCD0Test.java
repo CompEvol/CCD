@@ -1,9 +1,8 @@
-package test.ccd.model;
+package ccd.model;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
 import beastfx.app.treeannotator.TreeAnnotator;
-import ccd.model.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

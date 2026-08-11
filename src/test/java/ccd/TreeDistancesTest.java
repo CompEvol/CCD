@@ -1,4 +1,4 @@
-package test.ccd.algorithms;
+package ccd;
 
 import beast.base.evolution.tree.Tree;
 import beast.base.evolution.tree.TreeParser;
