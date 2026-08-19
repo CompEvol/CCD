@@ -8,4 +8,4 @@ out/
 .classpath
 .DS_Store
 /bin/
-.project
+.projecths_err_pid*.log

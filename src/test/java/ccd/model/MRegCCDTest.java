@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Validates the one-parameter per-new-split {@link MRegCCD}: that with the full reserve depth it is an
+ * Validates the one-parameter per-new-split {@link MRegCCDSlow}: that with the full reserve depth it is an
  * exactly normalised distribution on enumerable taxon sets, and that truncating the reserve without a
  * tail correction super-normalises it (the artefact that made order-2 falsely appear to close the gap
  * to KRegCCD in the RSV2 experiment).
@@ -64,7 +64,7 @@ public class MRegCCDTest {
         return out;
     }
 
-    private static double totalMass(MRegCCD m, List<String> taxa) {
+    private static double totalMass(MRegCCDSlow m, List<String> taxa) {
         double sum = 0.0;
         for (T t : allTopologies(taxa)) {
             Tree tree = new TreeParser(taxa, topo(t) + ";", 1, false);
@@ -85,10 +85,10 @@ public class MRegCCDTest {
         List<String> taxa = Arrays.asList("A", "B", "C", "D", "E");
         List<Tree> train = trees(taxa,
                 List.of(cat("A", "B", "C", "D", "E"), cat("D", "C", "B", "A", "E")));
-        MRegCCD m = new MRegCCD(train, 0.0, mu, taxa.size(), false); // full depth -> no omitted tail
+        MRegCCDSlow m = new MRegCCDSlow(train, 0.0, mu, taxa.size(), false); // full depth -> no omitted tail
         double sum = totalMass(m, taxa);
-        System.out.printf("MRegCCD 5 taxa mu=%.2f full-depth SUM = %.12f%n", mu, sum);
-        assertEquals(1.0, sum, 1e-9, "MRegCCD at full reserve depth must be exactly normalised");
+        System.out.printf("MRegCCDSlow 5 taxa mu=%.2f full-depth SUM = %.12f%n", mu, sum);
+        assertEquals(1.0, sum, 1e-9, "MRegCCDSlow at full reserve depth must be exactly normalised");
     }
 
     private void check6(double mu) {
@@ -96,10 +96,10 @@ public class MRegCCDTest {
         List<Tree> train = trees(taxa,
                 List.of(new Node(cat("A", "B", "C", "D"), new Node(new Leaf("E"), new Leaf("F"))),
                         new Node(cat("D", "C", "B", "A"), new Node(new Leaf("E"), new Leaf("F")))));
-        MRegCCD m = new MRegCCD(train, 0.0, mu, taxa.size(), false);
+        MRegCCDSlow m = new MRegCCDSlow(train, 0.0, mu, taxa.size(), false);
         double sum = totalMass(m, taxa);
-        System.out.printf("MRegCCD 6 taxa mu=%.2f full-depth SUM = %.12f%n", mu, sum);
-        assertEquals(1.0, sum, 1e-9, "MRegCCD at full reserve depth must be exactly normalised");
+        System.out.printf("MRegCCDSlow 6 taxa mu=%.2f full-depth SUM = %.12f%n", mu, sum);
+        assertEquals(1.0, sum, 1e-9, "MRegCCDSlow at full reserve depth must be exactly normalised");
     }
 
     @Test
@@ -112,7 +112,7 @@ public class MRegCCDTest {
         for (int i = 0; i < all.size(); i += 47) picks.add(all.get(i)); // ~20 trees spread across the space
         List<Tree> train = trees(taxa, picks);
 
-        MRegCCD mreg = new MRegCCD(train, 0.0, 0.05);
+        MRegCCDSlow mreg = new MRegCCDSlow(train, 0.0, 0.05);
         CCD0 ccd0 = new CCD0(train, 0);
 
         int checked = 0, withRecomb = 0;
@@ -146,7 +146,7 @@ public class MRegCCDTest {
         List<T> picks = new ArrayList<>();
         for (int i = 0; i < all.size(); i += 31) picks.add(all.get(i));
         List<Tree> train = trees(taxa, picks);
-        MRegCCD m = new MRegCCD(train, 0.0, 0.1, taxa.size(), false); // full depth, tail off
+        MRegCCDSlow m = new MRegCCDSlow(train, 0.0, 0.1, taxa.size(), false); // full depth, tail off
 
         // true entropy and normalisation by enumeration (scorer)
         double sum = 0.0, H = 0.0;
@@ -169,7 +169,7 @@ public class MRegCCDTest {
         }
         double hHat = s1 / N;
         double se = Math.sqrt(Math.max(0, s2 / N - hHat * hHat) / N);
-        System.out.printf("MRegCCD sampler: H_enum=%.5f  H_MC=%.5f +/- %.5f (%.1f SE off)%n",
+        System.out.printf("MRegCCDSlow sampler: H_enum=%.5f  H_MC=%.5f +/- %.5f (%.1f SE off)%n",
                 H, hHat, se, Math.abs(hHat - H) / se);
         assertEquals(H, hHat, Math.max(5 * se, 0.01),
                 "sampler entropy must match the scorer's enumerated entropy");
@@ -182,9 +182,9 @@ public class MRegCCDTest {
                 List.of(new Node(cat("A", "B", "C", "D"), new Node(new Leaf("E"), new Leaf("F"))),
                         new Node(cat("D", "C", "B", "A"), new Node(new Leaf("E"), new Leaf("F")))));
         double mu = 0.2;
-        double full = totalMass(new MRegCCD(train, 0.0, mu, taxa.size(), false), taxa);
-        double order2 = totalMass(new MRegCCD(train, 0.0, mu, 2, false), taxa); // M2 only, no tail
-        System.out.printf("MRegCCD 6 taxa mu=%.2f: full-depth SUM=%.9f  order-2 SUM=%.9f%n", mu, full, order2);
+        double full = totalMass(new MRegCCDSlow(train, 0.0, mu, taxa.size(), false), taxa);
+        double order2 = totalMass(new MRegCCDSlow(train, 0.0, mu, 2, false), taxa); // M2 only, no tail
+        System.out.printf("MRegCCDSlow 6 taxa mu=%.2f: full-depth SUM=%.9f  order-2 SUM=%.9f%n", mu, full, order2);
         assertEquals(1.0, full, 1e-9, "full depth normalised");
         assertTrue(order2 > 1.0 + 1e-4,
                 "order-2 reserve (no tail) must super-normalise (sum > 1), got " + order2);
