@@ -80,12 +80,12 @@ where `/path/to` the path to where BEAST is installed. For Windows, use
 
 For CCD1 based point estimates select `MAP (CCD1)` from the drop down box in the GUI, or use `CCD1` instead of `CCD0` for the command line version.
 
-### Phylogenetic Entropy, Rogue & Skeleton Analysis
+### AppLauncher Tools
 
-The CCD package has three tools (small apps) to compute the phylogenetic entropy of a tree set, compute rogues scores for each clade, and conduct a skeleton analysis
-that can each be executed with BEAST's AppLauncher.
+The CCD package comes with a set of tools (small apps) that can each be executed with BEAST's AppLauncher.
 Note that the given trees *need to be binary* and are assumed to be rooted; they are typically given by a NEXUS `.tree` file, but a list of Newick strings also works.
-For more information on the concepts see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1) 
+When a tool finishes, it prints the reference(s) to cite for the method it implements; this is written to stderr, so it does not interfere with results written to stdout.
+For more information on the concepts behind the entropy, rogue and skeleton tools see the [paper](https://www.biorxiv.org/content/10.1101/2024.09.25.615070v1)
 and for further information and example data see the [research paper repository](https://github.com/CompEvol/CCD-Research/tree/main/skeletonsAndRogues).
 
 
@@ -99,6 +99,22 @@ It has three parameters:
 - `trees`: trees file for which to compute entropy (required)
 - `burnin`: percentage of trees to be used as burn-in (default: `10%`)
 - `ccdType`: either `CCD0`, `CCD1`, or `CCD2` (default: `CCD0`)
+
+
+#### Dissonance
+
+The tool `DissonanceCalculator` computes the phylogenetic entropy (via CCD0) of one or more tree sets and, with the `dissonance` flag, also reports a dissonance value for each of them.
+The dissonance is computed by splitting a tree set into its first and second half and subtracting the mean entropy of the two halves from the entropy of the whole set.
+It is thus a diagnostic *within* a single tree set and not a comparison *between* the given tree files.
+```
+/path/to/applauncher DissonanceCalculator -trees /path/to/treeInputFile.trees -burnin 10 -dissonance true
+```
+The app has the following parameters:
+- `trees`: trees file to analyse; can be given more than once to process several tree sets in one run
+- `burnin`: percentage of trees to be used as burn-in (integer, default: `10%`)
+- `dissonance`: `true` to also compute the dissonance of each tree set (default: `false`)
+- `summarise`: `true` to print the mean and standard deviation of the entropies across all given tree sets (default: `false`)
+- `quiet`: `true` to only output the entropy (and dissonance) values and nothing else (default: `false`)
 
 
 #### Rogue Analysis
@@ -147,17 +163,25 @@ If you further specify an output file, then the given tree set will be reduced/f
 - `out`: reduced tree output file; the given tree set will not be filtered if not specified
 - `exclude`: file name of text file containing taxa to exclude from filtering - can be comma, tab or newline delimited
 
-### Credible Level Evaluation
+#### Credible Level Evaluation
 
-The credible level of a tree within a credible CCD or a probability-based credible set (on a CCD) can be computed with the following tool.
+The **credible level** of a tree is the probability mass of the smallest credible set containing it,
+that is, the smallest α for which the tree lies in an α credible set.
+The tool `TreeCredibleLevel` computes it, together with the probability of the tree, from a CCD estimated from a posterior tree sample.
 ```
-/path/to/applauncher TreeCredibleLevel -trees /path/to/treeInputFile.trees -tree /path/to/treeInputFile.tree(s) -burnin 10 -out path/to/outputTreeFile
+/path/to/applauncher TreeCredibleLevel -trees /path/to/treeInputFile.trees -tree /path/to/testTreeFile.tree -burnin 10 -out path/to/outputFile
 ```
 The app has the following parameters:
-- `trees`: trees file to construct CCD with and analyse (required)
+- `trees`: trees file to construct the CCD with (required)
+- `tree`: tree file containing the tree for which the probability and credible level are computed (required); only the first tree is used
+- `out`: output file (required); the probability of the tree is written to the first line and its credible level to the second
 - `burnin`: percentage of trees to be used as burn-in (integer, default: `10%`)
-- `ccdType`: either `CCD0` or `CCD1` or `CCD2` (default: `CCD1`)
-- `tree`: tree for which the credible level is computed
-- `method`: whether to use probability-based method (`probability`, default) or a credible CCD (`credibleCCD`)
-For the probability-based method the following two parameters can be set:
-- `numsamples`: the number of trees sampled from the CCD to compute the credible level thresholds (default: `10000`)
+- `ccdType`: either `CCD0`, `CCD1`, or `CCD2` (default: `CCD0`)
+- `method`: whether to use the probability-based method (`probability`, default) or a credible CCD (`credibleCCD`)
+- `quiet`: `true` to only output the credible level and nothing else (default: `false`)
+
+For the probability-based method one further parameter can be set:
+- `numsamples`: the number of trees sampled from the CCD to compute the credible level thresholds (default: `100000`)
+
+Both methods are described in the [credible sets paper](https://doi.org/10.1093/molbev/msag141):
+Klawitter J, Drummond AJ (2026), *Bayesian credible sets for phylogenetic tree topologies with applications to coverage analysis and cross-model comparison*, Molecular Biology and Evolution 43(7), msag141.

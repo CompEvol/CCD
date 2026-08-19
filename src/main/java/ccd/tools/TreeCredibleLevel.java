@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
@@ -21,6 +22,9 @@ import java.io.IOException;
 
 import static ccd.algorithms.credibleSets.ProbabilityBasedCredibleSetComputer.DEFAULT_NUM_SAMPLES;
 
+@Citation(value = "Klawitter and Drummond (2026). Molecular Biology and Evolution 43(7), msag141.\n" +
+        "Bayesian credible sets for phylogenetic tree topologies with applications to coverage analysis and cross-model comparison.",
+        DOI = "https://doi.org/10.1093/molbev/msag141")
 @Description("Compute probability and credible level of given tree in CCD of given tree set")
 public class TreeCredibleLevel extends beast.base.inference.Runnable {
     // input
@@ -99,6 +103,7 @@ public class TreeCredibleLevel extends beast.base.inference.Runnable {
 
         if (!quiet) {
             Log.info("Done.");
+            CCDToolUtil.printCitations(this);
         }
     }
 
