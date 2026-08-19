@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.math.BigInteger;
 
 /**
  * MRegCCD -- the one-parameter "per-new-split" regularised CCD. It unifies RegCCD's split-expansion
@@ -180,6 +181,18 @@ public class MRegCCD extends CCD1 {
     @Override
     public boolean containsTree(Tree tree) {
         return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>MRegCCD is full support, so its support is every rooted topology on the taxon set, not just
+     * the topologies of its graph. The inherited graph count would understate this by many orders
+     * of magnitude and would contradict {@link #containsTree(Tree)}, which is always {@code true}.
+     */
+    @Override
+    public BigInteger getNumberOfTrees() {
+        return numberOfRootedTopologies(getNumberOfLeaves());
     }
 
     private double scoreTree(Tree tree, double scoreMu) {

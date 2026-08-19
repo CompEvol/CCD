@@ -72,7 +72,25 @@ public interface ITreeDistribution {
      */
     public boolean containsTree(Tree tree);
 
-    /** @return the number of trees (topologies) in this distribution */
+    /**
+     * Returns the size of this distribution's <em>support</em>, that is, the number of distinct
+     * tree topologies to which it assigns non-zero probability.
+     *
+     * <p>For a CCD whose support is exactly the set of topologies its graph represents (CCD0,
+     * CCD1, regCCD) this equals the number of topologies of the graph. For a full-support model
+     * (KRegCCD, MRegCCD, {@link UniformEscapeCCD}) it is the number of rooted topologies on the
+     * taxon set, which is strictly larger: those models place probability outside their graph.
+     * Implementations must report the support, not the graph, so that
+     * {@code getNumberOfTrees()} and {@link #containsTree(Tree)} agree.
+     *
+     * <p>The result is a {@link BigInteger} because it overflows {@code long} at a handful of
+     * taxa and {@code double} not long after: the number of rooted topologies needs 840 bits on
+     * 129 taxa and 1093 bits on 160, and a {@code double} overflows past about 1024 bits. Take
+     * logarithms with {@link AbstractCCD#logBigInteger(BigInteger)}, not via
+     * {@code doubleValue()}, which is infinite from roughly 155 taxa upwards.
+     *
+     * @return the number of topologies with non-zero probability under this distribution
+     */
     public BigInteger getNumberOfTrees();
 
     /**

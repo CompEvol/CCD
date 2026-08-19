@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
+import java.math.BigInteger;
 
 /**
  * Remco's "blue-region" CCD regularisation with <em>full support</em> (every tree
@@ -643,6 +644,18 @@ public class KRegCCD extends RegCCD {
     @Override
     public boolean containsTree(Tree tree) {
         return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>KRegCCD is full support, so its support is every rooted topology on the taxon set, not just
+     * the topologies of its graph. The inherited graph count would understate this by many orders
+     * of magnitude and would contradict {@link #containsTree(Tree)}, which is always {@code true}.
+     */
+    @Override
+    public BigInteger getNumberOfTrees() {
+        return numberOfRootedTopologies(getNumberOfLeaves());
     }
 
     /**
