@@ -107,6 +107,15 @@ public class SplitClassCost {
         return c;
     }
 
+    /** A node is blue for KRegCCD/MRegCCD purposes when its split introduces a novel clade. */
+    static boolean isBlue(Node n, Set<String> clades, Map<Node, java.util.BitSet> memo, int nTaxa) {
+        if (n.isLeaf() || n.getChildren().size() != 2) return false;
+        for (Node ch : n.getChildren()) {
+            if (!ch.isLeaf() && !clades.contains(clade(ch, memo, nTaxa))) return true;
+        }
+        return false;
+    }
+
     /**
      * Least squares WITHOUT an intercept; returns {b1..bk, R2}.
      *
@@ -242,6 +251,42 @@ public class SplitClassCost {
                 System.out.println("   <- for the two-novel row");
             }
         }
+        // How many terms does each model actually score? CRegCCD is a chain-rule CCD over every
+        // clade in the tree, so it contributes one factor per internal node -- including the novel
+        // clades themselves. KRegCCD and MRegCCD cluster novel nodes into maximal regions and
+        // score each region once at its top, so the nodes interior to a region never receive a
+        // conditional split distribution at all. Counting the nodes is exact, unlike regressing
+        // the score on class counts: the interior count is largely determined by the novel splits
+        // above it, so those columns are collinear and their coefficients are not identifiable.
+        long internal = 0, novelClade = 0, regionTop = 0, blue = 0;
+        for (Tree t : test) {
+            Map<Node, java.util.BitSet> memo = new HashMap<>();
+            for (Node nd : t.getNodesAsArray()) {
+                if (nd.isLeaf() || nd.getChildren().size() != 2) continue;
+                internal++;
+                boolean isB = isBlue(nd, clades, memo, nTaxa);
+                if (isB) blue++;
+                if (!clades.contains(clade(nd, memo, nTaxa)) && !nd.isRoot()) novelClade++;
+                if (isB) {
+                    Node par = nd.getParent();
+                    if (par == null || !isBlue(par, clades, memo, nTaxa)) regionTop++;
+                }
+            }
+        }
+        double perTree = 1.0 / test.size();
+        System.out.printf("%nterms scored per held-out tree (%d internal nodes each)%n", nTaxa - 1);
+        System.out.printf("  internal nodes                      %8.2f%n", internal * perTree);
+        System.out.printf("  novel clades (no observed counterpart) %5.2f%n", novelClade * perTree);
+        System.out.printf("  blue nodes (split introduces a novel clade) %2.2f%n", blue * perTree);
+        System.out.printf("  maximal novel regions               %8.2f%n", regionTop * perTree);
+        System.out.printf("  CRegCCD factors                     %8.2f  (one per internal node)%n",
+                internal * perTree);
+        System.out.printf("  KRegCCD / MRegCCD factors           %8.2f  (red nodes + one per region)%n",
+                (internal - blue + regionTop) * perTree);
+        System.out.printf("  difference                          %8.2f  factors per tree that CRegCCD%n",
+                (blue - regionTop) * perTree);
+        System.out.printf("%36s  pays and the others do not%n", "");
+
         System.out.println();
         System.out.println("Coefficients are nats per split of that class; more negative is a heavier");
         System.out.println("penalty. CRegCCD spreads the class total alpha2 uniformly over |A_4| ~ 2^(m-1)");
