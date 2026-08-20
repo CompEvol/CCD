@@ -44,9 +44,11 @@ import java.util.Map;
  * {@code eps} is solved from only the cheap low orders {@code j = 1..k} (boundaries
  * {@code 3..k+2}; {@code N_1} is {@code O(m^2)}, {@code N_2} is {@code O(m^3)} in
  * the number {@code m} of observed subclades), while regions of any depth are still
- * scored with that {@code eps}. The omitted deep orders contribute {@code O(mu^2/m)}
- * to the reserve — a rounding error — so this barely affects probabilities while
- * keeping the model tractable and full-support. Reserve depth {@code k = 2} (the
+ * scored with that {@code eps}. Since {@code eps ~ mu / N_1}, the omitted deep orders contribute
+ * {@code O(mu^(k+1))} to the reserve — {@code O(mu^3)} at the default {@code k = 2}, a rounding
+ * error — so this barely affects probabilities while keeping the model tractable and full-support.
+ * (Measured by exhaustive enumeration on 6- and 7-taxon sets: the truncation shifts total
+ * probability mass with a log-log slope in {@code mu} of 2.00 / 2.97 / 3.96 at {@code k = 1/2/3}.) Reserve depth {@code k = 2} (the
  * default) is recommended; an op-budget (scaled to the largest clade's N_1, overridable via
  * {@code -Dkreg.enumOps})
  * bounds even the low-order enumeration on pathological clades, and a clade with
@@ -112,13 +114,24 @@ public class KRegCCD extends RegCCD {
      * How to correct for the omitted reserve tail (orders &gt; reserve depth) when
      * discounting red splits by {@code 1 - mu - tail(C)}:
      * <ul>
-     *   <li>{@link #NONE}: no correction ({@code tail = 0}); slightly
-     *       super-normalised (inflates held-out scores by the tail).</li>
-     *   <li>{@link #BOUND}: geometric upper bound on the tail; provably
-     *       sub-normalised (never inflates).</li>
-     *   <li>{@link #SAMPLED}: Knuth estimate of the actual tail; near-exactly
-     *       normalised (up to Monte-Carlo noise).</li>
+     *   <li>{@link #NONE}: no correction ({@code tail = 0}). The truncation alone inflates by
+     *       {@code O(mu^(k+1))}, but that is dominated by the maximality deficit below, so the
+     *       model is net <em>sub</em>-normalised.</li>
+     *   <li>{@link #BOUND}: geometric upper bound on the tail; sub-normalised (never inflates).</li>
+     *   <li>{@link #SAMPLED}: Knuth estimate of the actual tail. This removes the
+     *       {@code O(mu^(k+1))} truncation, but NOT the maximality deficit, so it is
+     *       <em>not</em> exactly normalised — it lands within Monte-Carlo noise of {@code NONE}.</li>
      * </ul>
+     *
+     * <p><b>All three modes are sub-normalised by {@code Theta(mu^2)}</b>, and no tail correction
+     * removes it: a blue region is only scored at its <em>maximal</em> top, so each boundary part
+     * that is itself a reserving clade contributes {@code (1 - mu - tail)} rather than 1 — the
+     * {@code O(mu)}-per-reserving-boundary-part gap noted on {@link SamplingFidelity}. Summing
+     * {@link #getProbabilityOfTree} over every tree on 7 taxa (2 training trees, {@code k = 2})
+     * gives total mass {@code -4.7e-3 / -6.3e-3 / -4.7e-3} from 1 for NONE/BOUND/SAMPLED at
+     * {@code mu = 0.05}, and {@code -2.6e-6 / -2.7e-6 / -2.7e-6} at {@code mu = 0.001};
+     * the deficit scales as {@code mu^2} and persists at reserve depths where the truncation
+     * has fully converged.
      */
     public enum TailMode {NONE, BOUND, SAMPLED}
 
