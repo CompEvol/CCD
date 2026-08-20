@@ -80,6 +80,9 @@ public class SplitClassCost {
     /** mean parent-clade size actually seen in each (class, bin) cell, so the fitted penalty can be
      *  checked against an analytic prediction in m rather than against a bin label. */
     static double[] sumM = new double[4 * 6];
+    /** min and max parent-clade size per cell, so an open-ended top bin cannot hide its spread. */
+    static int[] minM = new int[4 * 6];
+    static int[] maxM = new int[4 * 6];
 
     static int bin(int m) {
         for (int i = 0; i < BIN_HI.length; i++) if (m <= BIN_HI[i]) return i;
@@ -103,8 +106,21 @@ public class SplitClassCost {
             int idx = cls * BIN_HI.length + bin(m);
             c[idx]++;
             sumM[idx] += m;
+            if (minM[idx] == 0 || m < minM[idx]) minM[idx] = m;
+            if (m > maxM[idx]) maxM[idx] = m;
         }
         return c;
+    }
+
+    /** Residual sum of squares of an intercept-free fit. */
+    static double rss(double[][] X, double[] y, double[] beta) {
+        double t = 0;
+        for (int i = 0; i < y.length; i++) {
+            double pred = 0;
+            for (int j = 0; j < X[i].length; j++) pred += beta[j] * X[i][j];
+            t += (y[i] - pred) * (y[i] - pred);
+        }
+        return t;
     }
 
     /** A node is blue for KRegCCD/MRegCCD purposes when its split introduces a novel clade. */
@@ -249,8 +265,65 @@ public class SplitClassCost {
                     else System.out.printf("%9.1f", sumM[3 * NB + bnd] / cnt);
                 }
                 System.out.println("   <- for the two-novel row");
+                System.out.printf("  %-10s", "range m");
+                for (int bnd = 0; bnd < NB; bnd++) {
+                    int cnt = tot[3 * NB + bnd];
+                    if (cnt < 20) System.out.printf("%9s", ".");
+                    else System.out.printf("%9s", minM[3 * NB + bnd] + "-" + maxM[3 * NB + bnd]);
+                }
+                System.out.println();
+                System.out.printf("  %-10s", "n splits");
+                for (int bnd = 0; bnd < NB; bnd++) System.out.printf("%9d", tot[3 * NB + bnd]);
+                System.out.println();
             }
         }
+        // Direct estimate of how the two-novel penalty scales with clade size, without binning.
+        // Binning forced an arbitrary "too few to report" threshold and then fitted a line through
+        // bin means as though each bin carried equal weight, when in this dataset the bins hold
+        // 23, 859 and 438 splits over clade sizes spanning 9 to 252. Here the size enters as a
+        // covariate instead: the design has, per tree, the counts of the first three classes, the
+        // count of two-novel splits, and the sum over those splits of (m-1) in one fit and of
+        // log m in the other. The coefficient on that last column is then the slope directly,
+        // estimated from every two-novel split with its proper weight.
+        //
+        // CRegCCD divides a class total by |A_2(C)| ~ 2^(m-1), so its slope against (m-1) should
+        // be -log 2 = -0.693 nats per taxon. KRegCCD and MRegCCD raise an escape rate to a power
+        // fixed by the region, with eps ~ mu/O(s^2), so theirs should be flat in m and instead
+        // linear in log m.
+        double[][] Xl = new double[n][5], Xg = new double[n][5];
+        for (int i = 0; i < n; i++) {
+            Map<Node, java.util.BitSet> memo = new HashMap<>();
+            for (Node nd : test.get(i).getNodesAsArray()) {
+                if (nd.isLeaf() || nd.getChildren().size() != 2) continue;
+                String C = clade(nd, memo, nTaxa);
+                String l = clade(nd.getChildren().get(0), memo, nTaxa);
+                String r = clade(nd.getChildren().get(1), memo, nTaxa);
+                boolean lo = clades.contains(l) || nd.getChildren().get(0).isLeaf();
+                boolean ro = clades.contains(r) || nd.getChildren().get(1).isLeaf();
+                String key = C + "|" + (l.compareTo(r) < 0 ? l + "," + r : r + "," + l);
+                int cls = splits.contains(key) ? 0 : (lo && ro) ? 1 : (lo || ro) ? 2 : 3;
+                int m = bits(nd, memo, nTaxa).cardinality();
+                if (cls < 3) { Xl[i][cls]++; Xg[i][cls]++; }
+                else {
+                    Xl[i][3]++; Xg[i][3]++;
+                    Xl[i][4] += m - 1;
+                    Xg[i][4] += Math.log(m);
+                }
+            }
+        }
+        System.out.printf("%ntwo-novel penalty scaling, estimated from all %d two-novel splits%n",
+                (int) java.util.Arrays.stream(Xl).mapToDouble(v -> v[3]).sum());
+        System.out.printf("  %-9s %14s %10s   %14s %10s%n", "model",
+                "slope /(m-1)", "RSS", "slope /log m", "RSS");
+        for (Map.Entry<String, double[]> e : ys.entrySet()) {
+            double[] rl = ols(Xl, e.getValue()), rg = ols(Xg, e.getValue());
+            System.out.printf("  %-9s %14.4f %10.0f   %14.4f %10.0f%n", e.getKey(),
+                    rl[4], rss(Xl, e.getValue(), rl), rg[4], rss(Xg, e.getValue(), rg));
+        }
+        System.out.printf("  %-9s %14.4f %10s   %14s %10s%n", "predicted", -Math.log(2), "",
+                "(flat)", "");
+        System.out.println("  lower RSS is the better-supported functional form");
+
         // How many terms does each model actually score? CRegCCD is a chain-rule CCD over every
         // clade in the tree, so it contributes one factor per internal node -- including the novel
         // clades themselves. KRegCCD and MRegCCD cluster novel nodes into maximal regions and
