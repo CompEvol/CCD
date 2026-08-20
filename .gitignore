@@ -8,4 +8,7 @@ out/
 .classpath
 .DS_Store
 /bin/
-.projecths_err_pid*.log
+.project
+
+# JVM crash logs from long benchmark runs
+hs_err_pid*.log
