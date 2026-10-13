@@ -34,10 +34,10 @@ public class FourTaxaRootSATest2 {
     @Test
     public void testProbabilities() {
         List<Tree> trees = sampleTreeList();
-        // CCD1CP ccd = new CCD1CP(trees, 0.0);
-        CCD0CP ccd = new CCD0CP(trees, 0.0);
-        // CCD1SJ ccd = new CCD1SJ(trees, 0.0);
-        // CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        // CCD1EL ccd = new CCD1EL(trees, 0.0);
+        CCD0EL ccd = new CCD0EL(trees, 0.0);
+        // CCD1EI ccd = new CCD1EI(trees, 0.0);
+        // CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         System.out.println("num of partitions = " + ccd.getNumberOfCladePartitions());
 

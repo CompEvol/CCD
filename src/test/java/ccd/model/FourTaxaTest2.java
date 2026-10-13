@@ -14,8 +14,8 @@ import java.util.List;
  * * Tree 3: (((A,B),C:0),D)   — C is SA
  * <p>
  * Expected probabilities under CCD1 (in eighty-firsts):
- * CP:  18, 18, 9
- * SJ:  27, 27, 27
+ * EL:  18, 18, 9
+ * EI:  27, 27, 27
  */
 
 public class FourTaxaTest2 {
@@ -36,7 +36,7 @@ public class FourTaxaTest2 {
     @Test
     public void testProbabilities() {
         List<Tree> trees = sampleTreeList();
-        CCD0CP ccd = new CCD0CP(trees, 0.0);
+        CCD0EL ccd = new CCD0EL(trees, 0.0);
 
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);
