@@ -65,10 +65,10 @@ public class CCD0Test {
     }
 
     @Test
-    public void testCCD0CP() throws IOException {
+    public void testCCD0EL() throws IOException {
         List<Tree> treeList = sampledTreeListSA();
         List<Tree> unsampledTreeList = unsampledTreeList();
-        CCD0CP ccd = new CCD0CP(treeList, 0);
+        CCD0EL ccd = new CCD0EL(treeList, 0);
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);
             for (CladePartition p : clade.getPartitions()) {
@@ -80,10 +80,10 @@ public class CCD0Test {
     }
 
     @Test
-    public void testCCD0SJ() throws IOException {
+    public void testCCD0EI() throws IOException {
         List<Tree> treeList = sampledTreeListSA();
         List<Tree> unsampledTreeList = unsampledTreeList();
-        CCD0SJ ccd = new CCD0SJ(treeList, 0);
+        CCD0EI ccd = new CCD0EI(treeList, 0);
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);
             for (CladePartition p : clade.getPartitions()) {
@@ -95,11 +95,11 @@ public class CCD0Test {
     }
 
     // @Test
-    // public void testCCD0CP2() throws IOException {
+    // public void testCCD0EL2() throws IOException {
     //     List<Tree> treeList = sampledTreeList2();
     //     List<Tree> unsampledTreeList = unsampledTreeList();
     //     TreeAnnotator.MemoryFriendlyTreeSet treeSet = sampledTreeSet();
-    //     CCD0CP ccd = new CCD0CP(treeSet);
+    //     CCD0EL ccd = new CCD0EL(treeSet);
     //     for (Clade clade : ccd.getClades()) {
     //         System.out.println(clade);
     //         for (CladePartition p : clade.getPartitions()) {
@@ -115,10 +115,10 @@ public class CCD0Test {
     // }
     //
     // @Test
-    // public void testCCD0SJ() throws IOException {
+    // public void testCCD0EI() throws IOException {
     //     List<Tree> treeList = sampledTreeList();
     //     TreeAnnotator.MemoryFriendlyTreeSet treeSet = sampledTreeSet();
-    //     CCD0SJ ccd = new CCD0SJ(treeSet);
+    //     CCD0EI ccd = new CCD0EI(treeSet);
     //     double p1 = ccd.getProbabilityOfTree(treeList.get(0));
     //     System.out.println("p1 = " + p1);
     // }

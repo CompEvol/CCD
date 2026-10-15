@@ -336,8 +336,20 @@ public class KRegCCD extends RegCCD {
      * @param folds number of cross-validation folds
      */
     public static KRegCCD withOptimisedParameters(List<Tree> trees, int folds) {
-        KRegCCDParameterOptimiser.Params p = KRegCCDParameterOptimiser.optimise(trees, folds, NNIHeldOutComparison.FoldAssignment.CONTIGUOUS);
-        return new KRegCCD(trees, 0.0, p.mu(), p.alpha(), DEFAULT_RESERVE_DEPTH, TailMode.BOUND);
+        return withOptimisedParameters(trees, folds, DEFAULT_RESERVE_DEPTH);
+    }
+
+    /**
+     * As {@link #withOptimisedParameters(List, int)} but at an explicit reserve depth {@code k},
+     * used both for the cross-validated search and for the returned model. The search is dominated
+     * by the per-clade reserve solve, and almost all of that is the boundary-4 (N_2) match that
+     * {@code k = 1} skips; on very large clade sets the default depth can make the search
+     * intractable. Prefer the default unless it is.
+     */
+    public static KRegCCD withOptimisedParameters(List<Tree> trees, int folds, int k) {
+        KRegCCDParameterOptimiser.Params p = KRegCCDParameterOptimiser.optimise(
+                trees, folds, NNIHeldOutComparison.FoldAssignment.CONTIGUOUS, k);
+        return new KRegCCD(trees, 0.0, p.mu(), p.alpha(), k, TailMode.BOUND);
     }
 
     /** As {@link #withOptimisedParameters(List, int)} with {@link KRegCCDParameterOptimiser#DEFAULT_FOLDS} folds. */

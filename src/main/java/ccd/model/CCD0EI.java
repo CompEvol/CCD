@@ -11,23 +11,23 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * CCD0 normalisation on the extended-split (SJ) clade identity for
- * sampled-ancestor trees. The CCD0-normalised companion to {@link CCD1SJ}:
+ * CCD0 normalisation on the extended-split (EI) clade identity for
+ * sampled-ancestor trees. The CCD0-normalised companion to {@link CCD1EI}:
  * same identity, but partition probabilities are derived from clade
  * frequencies via the expand-and-normalise step (CCD0), instead of from
  * observed split counts alone (CCD1).
  *
  * <p>Identity construction, key layout, sampling, MAP selection, and tree
- * probability traversal are shared with {@link CCD1SJ} via
- * {@link SJSupport}; see that class for the SJ identity definition. What's
- * specific to CCD0SJ:
+ * probability traversal are shared with {@link CCD1EI} via
+ * {@link EISupport}; see that class for the EI identity definition. What's
+ * specific to CCD0EI:
  *
  * <h3>Tree probability</h3>
  *
  * <p>{@code P(T)} is the product of normalised CCPs along the tree path
- * (under the SJ identity), folding in the placeholder root's
+ * (under the EI identity), folding in the placeholder root's
  * {@code (variant, emptyClade)} CCP at the top. CCPs come from CCD0's
- * expand-and-normalise step run on the SJ extended-clade graph: for each
+ * expand-and-normalise step run on the EI extended-clade graph: for each
  * clade {@code C}, the CCP of partition {@code (A, B)} is proportional to
  * the product of subtree clade-credibility masses of {@code A} and
  * {@code B}, normalised across all partitions on {@code C}. With expansion
@@ -51,12 +51,12 @@ import java.util.Map;
  * <p>The CCD0 expand step is overridden ({@link #expand()}) for two
  * reasons: (1) it must operate on taxa-only bitmasks for disjointness/union
  * checks, since the SA flags otherwise spill out of the size-n bucket
- * arrays in {@link CCD0#expand()}, and (2) it enforces SJ-flag
+ * arrays in {@link CCD0#expand()}, and (2) it enforces EI-flag
  * compatibility on registered partitions
- * ({@link SJSupport#isSJCompatible}), so the model never assigns
+ * ({@link EISupport#isEICompatible}), so the model never assigns
  * probability to trees that violate the parent's SA-flag identity.
  */
-public class CCD0SJ extends CCD0 {
+public class CCD0EI extends CCD0 {
 
     /**
      * Shared empty sister used in rootClade's (variant, emptyClade) partitions.
@@ -65,23 +65,23 @@ public class CCD0SJ extends CCD0 {
      */
     protected Clade emptyClade;
 
-    public CCD0SJ(List<Tree> trees, double burnin) {
+    public CCD0EI(List<Tree> trees, double burnin) {
         super(trees, burnin);
     }
 
-    public CCD0SJ(TreeSet treeSet) {
+    public CCD0EI(TreeSet treeSet) {
         super(treeSet);
     }
 
-    public CCD0SJ(TreeSet treeSet, int numTreesToUse) {
+    public CCD0EI(TreeSet treeSet, int numTreesToUse) {
         super(treeSet, numTreesToUse);
     }
 
-    public CCD0SJ(TreeSet treeSet, boolean storeBaseTrees) {
+    public CCD0EI(TreeSet treeSet, boolean storeBaseTrees) {
         super(treeSet, storeBaseTrees);
     }
 
-    public CCD0SJ(int numLeaves, boolean storeBaseTrees) {
+    public CCD0EI(int numLeaves, boolean storeBaseTrees) {
         super(numLeaves, storeBaseTrees);
     }
 
@@ -89,7 +89,7 @@ public class CCD0SJ extends CCD0 {
 
     @Override
     protected void initializeRootClade(int numLeaves) {
-        this.emptyClade = SJSupport.initializeSJRoot(this, numLeaves);
+        this.emptyClade = EISupport.initializeEIRoot(this, numLeaves);
         // CCD0's recursive setPartitionProbabilities short-circuits on a
         // positive sumCladeCredibilities, so seed the empty sister with the
         // neutral value 1.0 before the first call.
@@ -100,19 +100,19 @@ public class CCD0SJ extends CCD0 {
 
     @Override
     protected Clade cladifyVertex(Node vertex) {
-        return SJSupport.cladifyTreeRoot(this, emptyClade, vertex);
+        return EISupport.cladifyTreeRoot(this, emptyClade, vertex);
     }
 
     /* -- SA DETECTION & DISPLAY -- */
 
     @Override
     public boolean isSampledAncestor(Clade clade) {
-        return SJSupport.isSampledAncestor(clade, leafArraySize);
+        return EISupport.isSampledAncestor(clade, leafArraySize);
     }
 
     @Override
     protected String getSampledAncestorInfoString(Clade clade) {
-        return SJSupport.saInfoString(clade, leafArraySize);
+        return EISupport.saInfoString(clade, leafArraySize);
     }
 
     /* -- EXPAND -- */
@@ -124,7 +124,7 @@ public class CCD0SJ extends CCD0 {
      * break the size-n bucket arrays in {@link CCD0#expand()}). A discovered
      * partition (A, B) is registered on every SA-variant of the parent
      * clade sharing that base mask whose SA flags are compatible with the
-     * partition (see {@link SJSupport#isSJCompatible}).
+     * partition (see {@link EISupport#isEICompatible}).
      *
      * <p>The placeholder {@code rootClade} (size 0, sentinel bit set) and
      * the shared {@code emptyClade} are skipped: the placeholder root only
@@ -168,7 +168,7 @@ public class CCD0SJ extends CCD0 {
                     if (parent == A || parent == B) continue;
                     if (parent.size() <= 2) continue; // cherries already complete
                     if (parent.getCladePartition(A, B) != null) continue;
-                    if (!SJSupport.isSJCompatible(parent, A, B, leafArraySize)) continue;
+                    if (!EISupport.isEICompatible(parent, A, B, leafArraySize)) continue;
                     parent.createCladePartition(A, B);
                 }
             }
@@ -195,33 +195,33 @@ public class CCD0SJ extends CCD0 {
 
     @Override
     protected Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability, boolean computeLog) {
-        return SJSupport.computeTreeProbability(this, emptyClade, vertex, runningProbability, computeLog);
+        return EISupport.computeTreeProbability(this, emptyClade, vertex, runningProbability, computeLog);
     }
 
     /* -- SAMPLING & MAP -- */
 
     /**
-     * Builds a tree under the SJ identity. The {@code heightStrategy}
+     * Builds a tree under the EI identity. The {@code heightStrategy}
      * argument is currently ignored — see
-     * {@link SJSupport#buildTree(AbstractCCD, Clade, SamplingStrategy, HeightSettingStrategy)}
+     * {@link EISupport#buildTree(AbstractCCD, Clade, SamplingStrategy, HeightSettingStrategy)}
      * for the TODO and the reason.
      */
     @Override
     protected Tree getTreeBasedOnStrategy(SamplingStrategy samplingStrategy,
                                           HeightSettingStrategy heightStrategy) {
-        return SJSupport.buildTree(this, emptyClade, samplingStrategy, heightStrategy);
+        return EISupport.buildTree(this, emptyClade, samplingStrategy, heightStrategy);
     }
     
     /* -- MISC -- */
 
     @Override
     public String toString() {
-        return "CCD0-SJ " + super.toString().replaceFirst("CCD0 ", "");
+        return "CCD0-EI " + super.toString().replaceFirst("CCD0 ", "");
     }
 
     @Override
     public AbstractCCD copy() {
-        CCD0SJ copy = new CCD0SJ(this.getSizeOfLeavesArray(), false);
+        CCD0EI copy = new CCD0EI(this.getSizeOfLeavesArray(), false);
         copy.baseTrees.add(this.getSomeBaseTree());
         copy.numBaseTrees = this.getNumberOfBaseTrees();
         AbstractCCD.buildCopy(this, copy);

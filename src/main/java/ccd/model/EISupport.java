@@ -7,11 +7,11 @@ import ccd.model.bitsets.BitSet;
 import java.util.ArrayList;
 
 /**
- * Shared logic for the extended-split (SJ) sampled-ancestor clade identity,
- * factored out so {@link CCD1SJ} and {@link CCD0SJ} share one implementation
+ * Shared logic for the extended-split (EI) sampled-ancestor clade identity,
+ * factored out so {@link CCD1EI} and {@link CCD0EI} share one implementation
  * (Java's single-inheritance forces them to extend different parents).
  *
- * <p>The SJ identity (per {@code alexei_c_four_sa_models.pdf}, Table 1):
+ * <p>The EI identity (per {@code alexei_c_four_sa_models.pdf}, Table 1):
  * each internal clade carries SA flags for its direct leaf children only,
  * with no propagation up the tree. Identity bitset width is {@code 2n+1}:
  * <ul>
@@ -30,13 +30,13 @@ import java.util.ArrayList;
  * are accessible from this same package) and the {@code emptyClade}
  * argument.
  */
-final class SJSupport {
+final class EISupport {
 
-    private SJSupport() {
+    private EISupport() {
     }
 
     /**
-     * Bitset width used for all clades under the SJ identity: {@code 2n + 1}
+     * Bitset width used for all clades under the EI identity: {@code 2n + 1}
      * (taxa bits, SA-flag bits, sentinel bit).
      */
     static int extendedBitWidth(int leafArraySize) {
@@ -47,7 +47,7 @@ final class SJSupport {
 
     /**
      * Bitset key for a leaf clade: only the taxon bit is set (SA flags live
-     * on the parent under the SJ identity, not on the leaf itself).
+     * on the parent under the EI identity, not on the leaf itself).
      */
     static BitSet leafKey(int taxonIndex, int leafArraySize) {
         BitSet key = BitSet.newBitSet(extendedBitWidth(leafArraySize));
@@ -56,7 +56,7 @@ final class SJSupport {
     }
 
     /**
-     * Bitset key for an internal clade under the SJ identity: union of
+     * Bitset key for an internal clade under the EI identity: union of
      * descendant taxa bits, plus an SA-flag bit for each direct leaf child of
      * this vertex with branch length zero. SA flags do not propagate up.
      */
@@ -89,7 +89,7 @@ final class SJSupport {
      * the empty sister so the caller can store the field reference. Must be
      * invoked from the subclass's {@code initializeRootClade} override.
      */
-    static Clade initializeSJRoot(AbstractCCD ccd, int numLeaves) {
+    static Clade initializeEIRoot(AbstractCCD ccd, int numLeaves) {
         ccd.leafArraySize = numLeaves;
         int width = extendedBitWidth(numLeaves);
 
@@ -105,16 +105,16 @@ final class SJSupport {
     /* -- TREE INSERTION -- */
 
     /**
-     * Top-level cladify entry: walks the tree under the SJ identity and
+     * Top-level cladify entry: walks the tree under the EI identity and
      * attaches the resulting root variant to {@code ccd.rootClade} via a
      * {@code (variant, emptyClade)} partition. Increments the placeholder
      * root's occurrence count once per tree.
      */
     static Clade cladifyTreeRoot(AbstractCCD ccd, Clade emptyClade, Node root) {
-        return cladifySJVertex(ccd, emptyClade, root, true);
+        return cladifyEIVertex(ccd, emptyClade, root, true);
     }
 
-    private static Clade cladifySJVertex(AbstractCCD ccd, Clade emptyClade, Node vertex, boolean isRoot) {
+    private static Clade cladifyEIVertex(AbstractCCD ccd, Clade emptyClade, Node vertex, boolean isRoot) {
         if (vertex.isLeaf()) {
             BitSet leafKey = leafKey(vertex.getNr(), ccd.leafArraySize);
             Clade leafClade = ccd.cladeMapping.get(leafKey);
@@ -125,8 +125,8 @@ final class SJSupport {
             return leafClade;
         }
 
-        Clade firstChildClade = cladifySJVertex(ccd, emptyClade, vertex.getChildren().get(0), false);
-        Clade secondChildClade = cladifySJVertex(ccd, emptyClade, vertex.getChildren().get(1), false);
+        Clade firstChildClade = cladifyEIVertex(ccd, emptyClade, vertex.getChildren().get(0), false);
+        Clade secondChildClade = cladifyEIVertex(ccd, emptyClade, vertex.getChildren().get(1), false);
 
         BitSet selfKey = extendedSelfKey(vertex, ccd.leafArraySize);
         Clade currentClade = ccd.cladeMapping.get(selfKey);
@@ -184,7 +184,7 @@ final class SJSupport {
         return "sampled ancestor taxa = " + sa;
     }
 
-    /* -- SJ-FLAG COMPATIBILITY (used by CCD0SJ.expand) -- */
+    /* -- EI-FLAG COMPATIBILITY (used by CCD0EI.expand) -- */
 
     /**
      * True iff the partition {@code (A, B)} is consistent with
@@ -193,7 +193,7 @@ final class SJSupport {
      * {@code A} or {@code B}. Used to filter expanded partitions so the
      * model never assigns probability to trees that violate the identity.
      */
-    static boolean isSJCompatible(Clade parent, Clade A, Clade B, int leafArraySize) {
+    static boolean isEICompatible(Clade parent, Clade A, Clade B, int leafArraySize) {
         BitSet bits = parent.getCladeInBits();
         for (int i = leafArraySize; i < 2 * leafArraySize; i++) {
             if (!bits.get(i)) continue;
@@ -209,14 +209,14 @@ final class SJSupport {
 
     /**
      * Computes {@code P(T)} (or its log) by walking {@code root} under the
-     * SJ identity and folding in CCPs along the path, including the
+     * EI identity and folding in CCPs along the path, including the
      * placeholder root's {@code (variant, emptyClade)} factor. Returns the
      * variant clade for the tree's root, or {@code null} if any vertex's
      * extended clade or partition isn't in the model.
      */
     static Clade computeTreeProbability(AbstractCCD ccd, Clade emptyClade, Node root,
                                         double[] runningProbability, boolean computeLog) {
-        Clade variant = computeProbSJVertex(ccd, root, runningProbability, computeLog);
+        Clade variant = computeProbEIVertex(ccd, root, runningProbability, computeLog);
         if (variant == null) return null;
         CladePartition rootPart = ccd.rootClade.getCladePartition(variant, emptyClade);
         if (rootPart == null) {
@@ -231,7 +231,7 @@ final class SJSupport {
         return variant;
     }
 
-    private static Clade computeProbSJVertex(AbstractCCD ccd, Node vertex,
+    private static Clade computeProbEIVertex(AbstractCCD ccd, Node vertex,
                                              double[] runningProbability, boolean computeLog) {
         if (vertex.isLeaf()) {
             BitSet leafKey = leafKey(vertex.getNr(), ccd.leafArraySize);
@@ -243,8 +243,8 @@ final class SJSupport {
             return leafClade;
         }
 
-        Clade firstChildClade = computeProbSJVertex(ccd, vertex.getChildren().get(0), runningProbability, computeLog);
-        Clade secondChildClade = computeProbSJVertex(ccd, vertex.getChildren().get(1), runningProbability, computeLog);
+        Clade firstChildClade = computeProbEIVertex(ccd, vertex.getChildren().get(0), runningProbability, computeLog);
+        Clade secondChildClade = computeProbEIVertex(ccd, vertex.getChildren().get(1), runningProbability, computeLog);
 
         if (firstChildClade == null || secondChildClade == null) {
             AbstractCCD.setComputedNoProbability(runningProbability, computeLog);
@@ -278,12 +278,12 @@ final class SJSupport {
      * Leave-one-tree-out counterpart of {@link #computeTreeProbability}: folds
      * in the held-out CCPs {@code (count-1+alpha)/(parentCount+alpha*k-1)}
      * instead of the in-sample CCPs, so the returned value is
-     * {@code P(T | CCD trained on all trees except T)}. Mirrors the EL/CP
+     * {@code P(T | CCD trained on all trees except T)}. Mirrors the CCD1/CCD1EL
      * held-out traversal in {@link CCD1#getLogProbOfHeldOutTree}: a clade or
      * partition seen only in the held-out tree contributes no probability.
      */
     static Clade computeTreeProbabilityHeldOut(AbstractCCD ccd, Clade emptyClade, Node root, double[] runningProbability, double alpha, boolean computeLog) {
-        Clade variant = computeProbSJVertexHeldOut(ccd, root, runningProbability, alpha, computeLog);
+        Clade variant = computeProbEIVertexHeldOut(ccd, root, runningProbability, alpha, computeLog);
         if (variant == null) return null;
         CladePartition rootPart = ccd.rootClade.getCladePartition(variant, emptyClade);
         if (rootPart == null) {
@@ -298,7 +298,7 @@ final class SJSupport {
         return variant;
     }
 
-    private static Clade computeProbSJVertexHeldOut(AbstractCCD ccd, Node vertex, double[] runningProbability, double alpha, boolean computeLog) {
+    private static Clade computeProbEIVertexHeldOut(AbstractCCD ccd, Node vertex, double[] runningProbability, double alpha, boolean computeLog) {
         if (vertex.isLeaf()) {
             BitSet leafKey = leafKey(vertex.getNr(), ccd.leafArraySize);
             Clade leafClade = ccd.cladeMapping.get(leafKey);
@@ -309,8 +309,8 @@ final class SJSupport {
             return leafClade;
         }
 
-        Clade firstChildClade = computeProbSJVertexHeldOut(ccd, vertex.getChildren().get(0), runningProbability, alpha, computeLog);
-        Clade secondChildClade = computeProbSJVertexHeldOut(ccd, vertex.getChildren().get(1), runningProbability, alpha, computeLog);
+        Clade firstChildClade = computeProbEIVertexHeldOut(ccd, vertex.getChildren().get(0), runningProbability, alpha, computeLog);
+        Clade secondChildClade = computeProbEIVertexHeldOut(ccd, vertex.getChildren().get(1), runningProbability, alpha, computeLog);
 
         if (firstChildClade == null || secondChildClade == null) {
             AbstractCCD.setComputedNoProbability(runningProbability, computeLog);
@@ -344,7 +344,7 @@ final class SJSupport {
     /* -- SAMPLING & MAP -- */
 
     /**
-     * Builds a tree under the SJ identity: pick a root variant via the
+     * Builds a tree under the EI identity: pick a root variant via the
      * placeholder root's {@code (variant, emptyClade)} partitions, then
      * recursively pick partitions on the variant's subtree.
      *
@@ -353,7 +353,7 @@ final class SJSupport {
      * get parent height for branch length zero), regardless of the
      * {@code heightStrategy} argument. Implementing
      * {@code MeanOccurredHeights} / {@code CommonAncestorHeights} correctly
-     * under SJ requires per-SA-context height stats: a leaf can appear as
+     * under EI requires per-SA-context height stats: a leaf can appear as
      * an SA child in some trees and a non-SA child in others, and
      * {@link Clade#getMeanOccurredHeight()} averages over both, which is
      * the wrong number whichever way you use it.
@@ -378,7 +378,7 @@ final class SJSupport {
     private static CladePartition pickRootPartition(AbstractCCD ccd, Clade emptyClade, SamplingStrategy strategy) {
         ArrayList<CladePartition> partitions = ccd.rootClade.getPartitions();
         if (partitions.isEmpty()) {
-            throw new AssertionError("SJ rootClade has no variant partitions.");
+            throw new AssertionError("EI rootClade has no variant partitions.");
         }
         if (strategy == SamplingStrategy.MAP) {
             double bestScore = Double.NEGATIVE_INFINITY;

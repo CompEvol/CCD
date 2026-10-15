@@ -19,10 +19,10 @@ public enum CCDType {
             return new CCD1(numberOfLeaves, false);
         }
     },
-    CCD1SJ("CCD1-SJ") {
+    CCD1EI("CCD1-EI") {
         @Override
         public AbstractCCD emptyCCDOfType(int numberOfLeaves) {
-            return new CCD1SJ(numberOfLeaves, false);
+            return new CCD1EI(numberOfLeaves, false);
         }
     },
     CCD2("CCD2") {
@@ -74,9 +74,9 @@ public enum CCDType {
             return CCD1;
         } else if (name.equalsIgnoreCase("2")) {
             return CCD2;
-        } else if (name.equalsIgnoreCase("1sj") || name.equalsIgnoreCase("sj")
-                || name.equalsIgnoreCase("ccd1sj")) {
-            return CCD1SJ;
+        } else if (name.equalsIgnoreCase("1ei") || name.equalsIgnoreCase("ei")
+                || name.equalsIgnoreCase("ccd1ei")) {
+            return CCD1EI;
         } else if (name.equalsIgnoreCase("kreg") || name.equalsIgnoreCase("kregccd")) {
             return KRegCCD;
         }

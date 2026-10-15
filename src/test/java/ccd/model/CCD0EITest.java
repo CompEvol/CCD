@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * CCD0SJ — clade-frequency parameterisation (CCD0) on the SJ extended-clade
+ * CCD0EI — clade-frequency parameterisation (CCD0) on the EI extended-clade
  * identity for sampled-ancestor trees.
  *
  * <p>Reuses the four-taxon worked example from {@code doc/sa-models.tex}:
@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * so the placeholder root has a single (variant, empty) partition with
  * marginal 1. Under CCD0 normalisation, the root variant's partitions get
  * scored by the product of child clade-frequencies; with the JS-style expand
- * step ({@link CCD0SJ#expand()}) one new root-level partition
+ * step ({@link CCD0EI#expand()}) one new root-level partition
  * ({A,B}-noSA, {C,D}-noSA) is added, plus two new partitions on
  * {A,B,C}-SA on C pairing C with the SA-flagged {A,B} cherries.
  *
@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </pre>
  * The remaining 4/9 mass is on three CCD0-expanded trees not in the sample.
  */
-public class CCD0SJTest {
+public class CCD0EITest {
 
     private static final List<String> TAXA = Arrays.asList("A", "B", "C", "D");
 
@@ -66,9 +66,9 @@ public class CCD0SJTest {
     }
 
     @Test
-    public void testCCD0SJProbabilities() {
+    public void testCCD0EIProbabilities() {
         List<Tree> trees = sampleTrees();
-        CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);
@@ -89,10 +89,10 @@ public class CCD0SJTest {
     }
 
     @Test
-    public void testCCD0CPProbabilities() {
+    public void testCCD0ELProbabilities() {
         List<Tree> trees = sampleTrees();
         List<Tree> unsampledTrees = unsampleTrees();
-        CCD0CP ccd = new CCD0CP(trees, 0.0);
+        CCD0EL ccd = new CCD0EL(trees, 0.0);
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);
             for (CladePartition p : clade.getPartitions()) {
@@ -124,7 +124,7 @@ public class CCD0SJTest {
     @Test
     public void testRootCCPsSumToOne() {
         List<Tree> trees = sampleTrees();
-        CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         // Single root variant → placeholder root partition CCP = 1.0.
         assertEquals(1, ccd.getRootClade().getPartitions().size(),
@@ -148,7 +148,7 @@ public class CCD0SJTest {
     @Test
     public void testLogProbabilityMatches() {
         List<Tree> trees = sampleTrees();
-        CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         for (Tree t : trees) {
             double p = ccd.getProbabilityOfTree(t);
@@ -158,7 +158,7 @@ public class CCD0SJTest {
     }
 
     /**
-     * With no SA leaves, CCD0SJ should produce the same tree probabilities as
+     * With no SA leaves, CCD0EI should produce the same tree probabilities as
      * a standard CCD0 — the SA-flag bits are never set and the placeholder
      * root collapses to a single (variant, empty) partition with CCP 1.
      */
@@ -170,20 +170,20 @@ public class CCD0SJTest {
         trees.add(parse("((A:1,B:1):1,(C:1,D:1):1):0;"));
 
         CCD0 baseline = new CCD0(trees, 0.0);
-        CCD0SJ sj = new CCD0SJ(trees, 0.0);
+        CCD0EI ei = new CCD0EI(trees, 0.0);
 
         for (Tree t : trees) {
             double pBaseline = baseline.getProbabilityOfTree(t);
-            double pSj = sj.getProbabilityOfTree(t);
-            assertEquals(pBaseline, pSj, 1e-9,
-                    "CCD0SJ matches CCD0 when there are no SA leaves");
+            double pEi = ei.getProbabilityOfTree(t);
+            assertEquals(pBaseline, pEi, 1e-9,
+                    "CCD0EI matches CCD0 when there are no SA leaves");
         }
     }
 
     @Test
     public void testSADetection() {
         List<Tree> trees = sampleTrees();
-        CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         boolean foundSAClade = false;
         for (ccd.model.Clade c : ccd.getClades()) {
@@ -216,14 +216,14 @@ public class CCD0SJTest {
     @Test
     public void testMAPTreePicksDominantVariant() {
         // Two trees with one root-split variant, one with the other; under
-        // CCD0SJ scoring (subtree clade-credibility mass), the duplicated
+        // CCD0EI scoring (subtree clade-credibility mass), the duplicated
         // variant has strictly greater MAP score and must win.
         List<Tree> trees = new ArrayList<>();
         trees.add(parse("((A:1,B:0):1,(C:1,D:1):1):0;"));
         trees.add(parse("((A:1,B:0):1,(C:1,D:1):1):0;"));
         trees.add(parse("(((A:1,B:1):1,C:0):1,D:2):0;"));
 
-        CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EI ccd = new CCD0EI(trees, 0.0);
         Tree map = ccd.getMAPTree();
 
         assertNotNull(map);

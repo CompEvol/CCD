@@ -7,52 +7,52 @@ import ccd.model.bitsets.BitSet;
 
 import java.util.*;
 
-public class CCD0CP extends CCD0 {
+public class CCD0EL extends CCD0 {
 
-    public CCD0CP(List<Tree> trees, double burnin) {
+    public CCD0EL(List<Tree> trees, double burnin) {
         super(trees, burnin);
     }
 
-    public CCD0CP(TreeAnnotator.TreeSet treeSet) {
+    public CCD0EL(TreeAnnotator.TreeSet treeSet) {
         super(treeSet);
     }
 
-    public CCD0CP(TreeAnnotator.TreeSet treeSet, int numTreesToUse) {
+    public CCD0EL(TreeAnnotator.TreeSet treeSet, int numTreesToUse) {
         super(treeSet, numTreesToUse);
     }
 
-    public CCD0CP(TreeAnnotator.TreeSet treeSet, boolean storeBaseTrees) {
+    public CCD0EL(TreeAnnotator.TreeSet treeSet, boolean storeBaseTrees) {
         super(treeSet, storeBaseTrees);
     }
 
-    public CCD0CP(int numLeaves, boolean storeBaseTrees) {
+    public CCD0EL(int numLeaves, boolean storeBaseTrees) {
         super(numLeaves, storeBaseTrees);
     }
 
     /* -- ROOT INITIALIZATION -- */
     @Override
     protected void initializeRootClade(int numLeaves) {
-        CPSupport.initializeRoot(this, numLeaves);
+        ELSupport.initializeRoot(this, numLeaves);
     }
 
     @Override
     protected Clade cladifyVertex(Node vertex) {
-        return CPSupport.cladifyVertex(this, vertex);
+        return ELSupport.cladifyVertex(this, vertex);
     }
 
     @Override
     public boolean isSampledAncestor(Clade clade) {
-        return CPSupport.isSampledAncestor(clade, leafArraySize);
+        return ELSupport.isSampledAncestor(clade, leafArraySize);
     }
 
     @Override
     protected String getSampledAncestorInfoString(Clade clade) {
-        return CPSupport.saInfoString(clade, leafArraySize);
+        return ELSupport.saInfoString(clade, leafArraySize);
     }
 
     @Override
     protected double computeParentHeight(CladePartition partition, Node firstChild, Node secondChild) {
-        return CPSupport.computeParentHeight(partition, firstChild, secondChild, leafArraySize);
+        return ELSupport.computeParentHeight(partition, firstChild, secondChild, leafArraySize);
     }
 
     @Override
@@ -99,7 +99,7 @@ public class CCD0CP extends CCD0 {
 
     @Override
     protected Clade computeProbabilityOfVertex(Node vertex, double[] runningProbability, boolean computeLog) {
-        return CPSupport.computeProbCPVertex(vertex, runningProbability, computeLog, this, leafArraySize);
+        return ELSupport.computeProbELVertex(vertex, runningProbability, computeLog, this, leafArraySize);
     }
 
     @Override
@@ -209,12 +209,12 @@ public class CCD0CP extends CCD0 {
 
     @Override
     public String toString() {
-        return "CCD0-CP " + super.toString().replaceFirst("CCD0 ", "");
+        return "CCD0-EL " + super.toString().replaceFirst("CCD0 ", "");
     }
 
     @Override
     public AbstractCCD copy() {
-        CCD0CP copy = new CCD0CP(this.getSizeOfLeavesArray(), false);
+        CCD0EL copy = new CCD0EL(this.getSizeOfLeavesArray(), false);
         copy.baseTrees.add(this.getSomeBaseTree());
         copy.numBaseTrees = this.getNumberOfBaseTrees();
         AbstractCCD.buildCopy(this, copy);
