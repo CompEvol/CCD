@@ -55,7 +55,10 @@ public class BitSet implements Cloneable {
         if (other instanceof BitSet256 set) {
             return new BitSet256(set);
         }
-        BitSet b = new BitSet(other.length());
+        // size(), not length(): length() is the index of the highest set bit plus one, so copying a
+        // set whose top words happen to be empty would return an undersized BitSet, and the bitwise
+        // operations below index the operand by this.words.length.
+        BitSet b = new BitSet(other.size());
         b.or(other);
         return b;
     }
