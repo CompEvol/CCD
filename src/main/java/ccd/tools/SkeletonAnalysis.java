@@ -1,6 +1,7 @@
 package ccd.tools;
 
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
@@ -30,6 +31,9 @@ import java.util.Set;
 
 import static ccd.algorithms.RogueDetection.TerminationStrategy.*;
 
+@Citation(value = "Klawitter, Bouckaert and Drummond (2024). bioRxiv.\n" +
+        "Skeletons in the forest: using entropy-based rogue detection on Bayesian phylogenetic tree distributions.",
+        DOI = "https://doi.org/10.1101/2024.09.25.615070")
 @Description("Analyses the skeleton of a CCD for given trees based on the total rogue scores (based on entropy)")
 public class SkeletonAnalysis extends Runnable {
     // input
@@ -145,6 +149,8 @@ public class SkeletonAnalysis extends Runnable {
         RogueDetection.annotateRoguePlacements(ccd, lastCCD, rogues, tree);
         System.out.println("The resulting annotated tree is: ");
         System.out.println(tree.getRoot().toNewick());
+
+        CCDToolUtil.printCitations(this);
     }
 
     /* Extracted code that filters source treeset. */

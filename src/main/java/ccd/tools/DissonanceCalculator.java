@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
@@ -13,6 +14,9 @@ import ccd.model.CCD0;
 import java.util.ArrayList;
 import java.util.List;
 
+@Citation(value = "Klawitter, Bouckaert and Drummond (2024). bioRxiv.\n" +
+        "Skeletons in the forest: using entropy-based rogue detection on Bayesian phylogenetic tree distributions.",
+        DOI = "https://doi.org/10.1101/2024.09.25.615070")
 @Description("Calculates the phylogenetic entropies of the posterior tree distribution (estimated via CCD0s) of given tree sets")
 public class DissonanceCalculator extends beast.base.inference.Runnable {
     final public Input<List<TreeFile>> treeInput = new Input<>("trees", "trees to include in dissonance calculation", new ArrayList<>());
@@ -32,7 +36,7 @@ public class DissonanceCalculator extends beast.base.inference.Runnable {
 
         long start = System.currentTimeMillis();
         if (!quiet) {
-            Log.info("# Starting Entropy Calculator");
+            Log.info("# Starting Dissonance Calculator");
         }
 
         List<Double> entropies = new ArrayList<>();
@@ -115,11 +119,12 @@ public class DissonanceCalculator extends beast.base.inference.Runnable {
         long end = System.currentTimeMillis();
         if (!quiet) {
             Log.info("Done in  " + (end - start) / 1000.0 + " seconds");
+            CCDToolUtil.printCitations(this);
         }
     }
 
     public static void main(String[] args) throws Exception {
-        new Application(new DissonanceCalculator(), "Entropy Calculator", args);
+        new Application(new DissonanceCalculator(), "Dissonance Calculator", args);
     }
 
 }

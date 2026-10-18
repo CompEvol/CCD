@@ -4,9 +4,12 @@ open module ccd {
     requires static beast.fx;
     requires static javafx.controls;
     requires org.apache.commons.math4.legacy;
+    requires org.apache.commons.numbers.core;
+    requires org.apache.commons.numbers.combinatorics;
 
     exports ccd.algorithms;
     exports ccd.algorithms.credibleSets;
+    exports ccd.algorithms.prior;
     exports ccd.algorithms.regularisation;
     exports ccd.model;
     exports ccd.model.bitsets;

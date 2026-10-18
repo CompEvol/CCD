@@ -23,5 +23,7 @@
     <packageapp description="Entropy Calculator" class="ccd.tools.EntropyCalculator" args=""/>
     <packageapp description="Skeleton Analysis" class="ccd.tools.SkeletonAnalysis" args=""/>
     <packageapp description="Rogue Analysis" class="ccd.tools.RogueAnalysis" args=""/>
+    <packageapp description="Dissonance Calculator" class="ccd.tools.DissonanceCalculator" args=""/>
+    <packageapp description="Tree Credible Level" class="ccd.tools.TreeCredibleLevel" args=""/>
 
 </package>

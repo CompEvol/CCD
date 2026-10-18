@@ -4,6 +4,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
@@ -14,6 +15,9 @@ import beastfx.app.util.TreeFile;
 import ccd.model.AbstractCCD;
 import ccd.model.CCDType;
 
+@Citation(value = "Klawitter, Bouckaert and Drummond (2024). bioRxiv.\n" +
+        "Skeletons in the forest: using entropy-based rogue detection on Bayesian phylogenetic tree distributions.",
+        DOI = "https://doi.org/10.1101/2024.09.25.615070")
 @Description("Calculates the phylogenetic entropy of the posterior tree distribution")
 public class EntropyCalculator extends beast.base.inference.Runnable {
     // input
@@ -64,6 +68,10 @@ public class EntropyCalculator extends beast.base.inference.Runnable {
 	        }
 	        k++;
     	}
+
+        if (verboseInput.get()) {
+            CCDToolUtil.printCitations(this);
+        }
     }
 
     public static void main(String[] args) throws Exception {

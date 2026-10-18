@@ -19,10 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Tree 3: (((A,B),C:0),D)   — C is SA
  * <p>
  * Expected probabilities (in eighty-firsts):
- * CP:  18, 18, 9
- * SJ:  27, 27, 27
+ * EL:  18, 18, 9
+ * EI:  27, 27, 27
  */
-public class CCD1SJTest {
+public class CCD1EITest {
 
     private static final List<String> TAXA = Arrays.asList("A", "B", "C", "D");
 
@@ -43,50 +43,50 @@ public class CCD1SJTest {
     }
 
     @Test
-    public void testCCD1SJProbabilities() {
+    public void testCCD1EIProbabilities() {
         List<Tree> trees = sampleTrees();
-        CCD1SJ sj = new CCD1SJ(trees, 0.0);
+        CCD1EI ei = new CCD1EI(trees, 0.0);
 
-        for (Clade clade : sj.getClades()) {
+        for (Clade clade : ei.getClades()) {
             System.out.println(clade);
             for (CladePartition p : clade.getPartitions()) {
                 System.out.println(p);
             }
         }
 
-        double p1 = sj.getProbabilityOfTree(trees.get(0));
-        double p2 = sj.getProbabilityOfTree(trees.get(1));
-        double p3 = sj.getProbabilityOfTree(trees.get(2));
+        double p1 = ei.getProbabilityOfTree(trees.get(0));
+        double p2 = ei.getProbabilityOfTree(trees.get(1));
+        double p3 = ei.getProbabilityOfTree(trees.get(2));
 
-        assertEquals(27.0 / 81.0, rounded(p1), 1e-9, "SJ P(Tree 1)");
-        assertEquals(27.0 / 81.0, rounded(p2), 1e-9, "SJ P(Tree 2)");
-        assertEquals(27.0 / 81.0, rounded(p3), 1e-9, "SJ P(Tree 3)");
+        assertEquals(27.0 / 81.0, rounded(p1), 1e-9, "EI P(Tree 1)");
+        assertEquals(27.0 / 81.0, rounded(p2), 1e-9, "EI P(Tree 2)");
+        assertEquals(27.0 / 81.0, rounded(p3), 1e-9, "EI P(Tree 3)");
 
-        assertEquals(1.0, p1 + p2 + p3, 1e-9, "SJ total mass on sampled trees");
+        assertEquals(1.0, p1 + p2 + p3, 1e-9, "EI total mass on sampled trees");
     }
 
     @Test
-    public void testCCD1CPProbabilities() {
+    public void testCCD1ELProbabilities() {
         List<Tree> trees = sampleTrees();
-        CCD1CP cp = new CCD1CP(trees, 0.0);
+        CCD1EL el = new CCD1EL(trees, 0.0);
 
-        double p1 = cp.getProbabilityOfTree(trees.get(0));
-        double p2 = cp.getProbabilityOfTree(trees.get(1));
-        double p3 = cp.getProbabilityOfTree(trees.get(2));
+        double p1 = el.getProbabilityOfTree(trees.get(0));
+        double p2 = el.getProbabilityOfTree(trees.get(1));
+        double p3 = el.getProbabilityOfTree(trees.get(2));
 
-        assertEquals(18.0 / 81.0, rounded(p1), 1e-9, "CP P(Tree 1)");
-        assertEquals(18.0 / 81.0, rounded(p2), 1e-9, "CP P(Tree 2)");
-        assertEquals(9.0 / 81.0, rounded(p3), 1e-9, "CP P(Tree 3)");
+        assertEquals(18.0 / 81.0, rounded(p1), 1e-9, "EL P(Tree 1)");
+        assertEquals(18.0 / 81.0, rounded(p2), 1e-9, "EL P(Tree 2)");
+        assertEquals(9.0 / 81.0, rounded(p3), 1e-9, "EL P(Tree 3)");
     }
 
     @Test
-    public void testSJLogProbabilityMatches() {
+    public void testEILogProbabilityMatches() {
         List<Tree> trees = sampleTrees();
-        CCD1SJ sj = new CCD1SJ(trees, 0.0);
+        CCD1EI ei = new CCD1EI(trees, 0.0);
 
         for (Tree t : trees) {
-            double p = sj.getProbabilityOfTree(t);
-            double logp = sj.getLogProbabilityOfTree(t);
+            double p = ei.getProbabilityOfTree(t);
+            double logp = ei.getLogProbabilityOfTree(t);
             assertEquals(Math.log(p), logp, 1e-9, "log/prob consistency");
         }
     }
@@ -111,9 +111,9 @@ public class CCD1SJTest {
     }
 
     @Test
-    public void testSJSamplingMatchesAnalytical() {
+    public void testEISamplingMatchesAnalytical() {
         List<Tree> trees = sampleTrees();
-        CCD1SJ sj = new CCD1SJ(trees, 0.0);
+        CCD1EI ei = new CCD1EI(trees, 0.0);
 
         String sig1 = signature(trees.get(0).getRoot());
         String sig2 = signature(trees.get(1).getRoot());
@@ -122,7 +122,7 @@ public class CCD1SJTest {
         java.util.Map<String, Integer> counts = new java.util.HashMap<>();
         int N = 30000;
         for (int i = 0; i < N; i++) {
-            Tree sampled = sj.sampleTree();
+            Tree sampled = ei.sampleTree();
             String sig = signature(sampled.getRoot());
             counts.merge(sig, 1, Integer::sum);
         }
@@ -155,8 +155,8 @@ public class CCD1SJTest {
         trees.add(parse("((A:0,B:1):1,(C:1,D:1):1):0;"));
         trees.add(parse("(((A:1,B:1):1,C:0):1,D:2):0;"));
 
-        CCD1SJ sj = new CCD1SJ(trees, 0.0);
-        Tree map = sj.getMAPTree();
+        CCD1EI ei = new CCD1EI(trees, 0.0);
+        Tree map = ei.getMAPTree();
 
         assertEquals(signature(trees.get(0).getRoot()), signature(map.getRoot()),
                 "MAP tree should be the duplicated Tree-1 variant");

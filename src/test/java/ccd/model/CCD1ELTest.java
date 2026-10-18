@@ -22,11 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Tree 3: (((A,B),C:0),D)   — C is SA
  * <p>
  * Expected probabilities (in eighty-firsts):
- * CP:  18, 18, 9
- * SJ:  27, 27, 27
+ * EL:  18, 18, 9
+ * EI:  27, 27, 27
  */
 
-public class CCD1CPTest {
+public class CCD1ELTest {
 
     private static final List<String> TAXA = Arrays.asList("A", "B", "C", "D");
 
@@ -45,21 +45,21 @@ public class CCD1CPTest {
     @Test
     public void graphSizeTest() {
         List<Tree> trees = sampleTreeList();
-        CCD1CP ccd1cp = new CCD1CP(trees, 0.0);
-        CCD1SJ ccd1sj = new CCD1SJ(trees, 0.0);
-        CCD0CP ccd0cp = new CCD0CP(trees, 0.0);
-        CCD0SJ ccd0sj = new CCD0SJ(trees, 0.0);
-        System.out.println("ccd1 CP # clades = " + ccd1cp.getNumberOfClades());
-        System.out.println("ccd1 CP # splits = " + ccd1cp.getNumberOfCladePartitions());
-        System.out.println("ccd1 SJ # clades = " + ccd1sj.getNumberOfClades());
-        for (Clade clade : ccd1sj.getClades()) {
+        CCD1EL ccd1el = new CCD1EL(trees, 0.0);
+        CCD1EI ccd1ei = new CCD1EI(trees, 0.0);
+        CCD0EL ccd0el = new CCD0EL(trees, 0.0);
+        CCD0EI ccd0ei = new CCD0EI(trees, 0.0);
+        System.out.println("ccd1 EL # clades = " + ccd1el.getNumberOfClades());
+        System.out.println("ccd1 EL # splits = " + ccd1el.getNumberOfCladePartitions());
+        System.out.println("ccd1 EI # clades = " + ccd1ei.getNumberOfClades());
+        for (Clade clade : ccd1ei.getClades()) {
             System.out.println(clade);
         }
-        System.out.println("ccd1 SJ # splits = " + ccd1sj.getNumberOfCladePartitions());
-        System.out.println("ccd0 CP # clades = " + ccd0cp.getNumberOfClades());
-        System.out.println("ccd0 CP # splits = " + ccd0cp.getNumberOfCladePartitions());
-        System.out.println("ccd0 SJ # clades = " + ccd0sj.getNumberOfClades());
-        System.out.println("ccd0 SJ # splits = " + ccd0sj.getNumberOfCladePartitions());
+        System.out.println("ccd1 EI # splits = " + ccd1ei.getNumberOfCladePartitions());
+        System.out.println("ccd0 EL # clades = " + ccd0el.getNumberOfClades());
+        System.out.println("ccd0 EL # splits = " + ccd0el.getNumberOfCladePartitions());
+        System.out.println("ccd0 EI # clades = " + ccd0ei.getNumberOfClades());
+        System.out.println("ccd0 EI # splits = " + ccd0ei.getNumberOfCladePartitions());
     }
 
     @Test
@@ -89,27 +89,27 @@ public class CCD1CPTest {
                 new java.io.File("/Users/zyan598/Documents/GitHub/CCD_sampled_ancestor/example_trees/4taxa_alexei.trees").exists(),
                 "skipped: SA example tree file not present on this machine");
         TreeAnnotator.MemoryFriendlyTreeSet treeSet = sampleTreeSet();
-        // CCD1 ccd = new CCD1CP(treeSet, false);
+        // CCD1 ccd = new CCD1EL(treeSet, false);
         // WrappedBeastTree mapTreeCCD1 = new WrappedBeastTree(ccd.getMAPTree());
         // System.out.println("CCD MAP tree log prob = " + ccd.getMaxLogTreeProbability());
     }
 
     @Test
-    public void testCCD1CPProbabilities() {
+    public void testCCD1ELProbabilities() {
         List<Tree> trees = sampleTreeList();
-        CCD1CP cp = new CCD1CP(trees, 0.0);
+        CCD1EL el = new CCD1EL(trees, 0.0);
 
-        for (Clade clade : cp.getClades()) {
+        for (Clade clade : el.getClades()) {
             System.out.println(clade);
         }
 
-        double p1 = cp.getProbabilityOfTree(trees.get(0));
-        double p2 = cp.getProbabilityOfTree(trees.get(1));
-        double p3 = cp.getProbabilityOfTree(trees.get(2));
+        double p1 = el.getProbabilityOfTree(trees.get(0));
+        double p2 = el.getProbabilityOfTree(trees.get(1));
+        double p3 = el.getProbabilityOfTree(trees.get(2));
 
-        assertEquals(18.0 / 81.0, rounded(p1), 1e-9, "CP P(Tree 1)");
-        assertEquals(18.0 / 81.0, rounded(p2), 1e-9, "CP P(Tree 2)");
-        assertEquals(9.0 / 81.0, rounded(p3), 1e-9, "CP P(Tree 3)");
+        assertEquals(18.0 / 81.0, rounded(p1), 1e-9, "EL P(Tree 1)");
+        assertEquals(18.0 / 81.0, rounded(p2), 1e-9, "EL P(Tree 2)");
+        assertEquals(9.0 / 81.0, rounded(p3), 1e-9, "EL P(Tree 3)");
 
     }
 }

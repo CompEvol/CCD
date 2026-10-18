@@ -25,7 +25,7 @@ public class FiveTaxaTest {
     @Test
     public void testProbabilities() {
         List<Tree> trees = sampleTreeList();
-        CCD0CP ccd = new CCD0CP(trees, 0.0);
+        CCD0EL ccd = new CCD0EL(trees, 0.0);
 
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);

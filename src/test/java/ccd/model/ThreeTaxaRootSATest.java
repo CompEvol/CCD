@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * * Tree 3: ((A,B:0),C:0)   — B,C are SA
  * <p>
  * Expected probabilities under CCD1:
- * CP:  2/9, 4/9, 2/9
- * SJ:  1/3, 1/3, 1/3
+ * EL:  2/9, 4/9, 2/9
+ * EI:  1/3, 1/3, 1/3
  */
 
 public class ThreeTaxaRootSATest {
@@ -39,8 +39,8 @@ public class ThreeTaxaRootSATest {
     @Test
     public void testProbabilities() {
         List<Tree> trees = sampleTreeList();
-        CCD0CP ccd = new CCD0CP(trees, 0.0);
-        // CCD0SJ ccd = new CCD0SJ(trees, 0.0);
+        CCD0EL ccd = new CCD0EL(trees, 0.0);
+        // CCD0EI ccd = new CCD0EI(trees, 0.0);
 
         for (Clade clade : ccd.getClades()) {
             System.out.println(clade);

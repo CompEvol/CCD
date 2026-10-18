@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Input.Validate;
@@ -23,6 +24,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 
+@Citation(value = "Klawitter, Bouckaert and Drummond (2024). bioRxiv.\n" +
+        "Skeletons in the forest: using entropy-based rogue detection on Bayesian phylogenetic tree distributions.",
+        DOI = "https://doi.org/10.1101/2024.09.25.615070")
 @Description("Analyse the clades in a CCD for given trees based on their clade rogue score (based on entropy)")
 public class RogueAnalysis extends Runnable {
 
@@ -141,6 +145,8 @@ public class RogueAnalysis extends Runnable {
         createNexusTreeFile(infoOutputFileName, tree);
 
         Log.warning("Done");
+
+        CCDToolUtil.printCitations(this);
     }
 
     private boolean cladeConditionSatisfied(Clade clade, int maxCladeSize, double minProbability) {

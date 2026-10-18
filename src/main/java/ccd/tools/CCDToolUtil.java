@@ -1,5 +1,7 @@
 package ccd.tools;
 
+import beast.base.core.Citable;
+import beast.base.core.Citation;
 import beast.base.core.Input;
 import beast.base.core.Log;
 import beastfx.app.treeannotator.TreeAnnotator;
@@ -14,6 +16,7 @@ import ccd.model.OptRegCCD;
 import ccd.model.RegCCD;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Static methods provided for tools {@link beastfx.app.tools.Application} in the CCD package
@@ -109,5 +112,31 @@ public class CCDToolUtil {
             throw new IllegalArgumentException("Illegal CCD type.");
         }
         return ccd;
+    }
+
+    /**
+     * Print the {@link Citation}s of the given tool, if it has any, in the style used by
+     * TreeAnnotator. Output goes to {@link Log#warning} (stderr) so that it does not interfere
+     * with results written to stdout.
+     *
+     * @param tool the tool whose citations are printed
+     */
+    public static void printCitations(Citable tool) {
+        List<Citation> citations = tool.getCitationList();
+        if (citations.isEmpty()) {
+            return;
+        }
+
+        StringBuilder buf = new StringBuilder();
+        buf.append("\n======================================================\n");
+        buf.append("Please cite the following when using these results:\n");
+        for (Citation citation : citations) {
+            buf.append("\n").append(citation.value()).append("\n");
+            if (!citation.DOI().isEmpty()) {
+                buf.append(citation.DOI()).append("\n");
+            }
+        }
+        buf.append("======================================================");
+        Log.warning(buf.toString());
     }
 }

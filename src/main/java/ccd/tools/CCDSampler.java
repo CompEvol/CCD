@@ -1,5 +1,6 @@
 package ccd.tools;
 
+import beast.base.core.Citation;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
@@ -19,6 +20,9 @@ import ccd.model.CCDType;
 import ccd.model.HeightSettingStrategy;
 import ccd.model.KRegCCD;
 
+@Citation(value = "Berling and Klawitter et al. (2025). PLOS Computational Biology.\n" +
+        "Accurate Bayesian phylogenetic point estimation using a tree distribution parameterized by clade probabilities.",
+        DOI = "https://doi.org/10.1371/journal.pcbi.1012789")
 @Description("Allows to sample from a CCD{0,1} based on a input set of trees")
 public class CCDSampler extends Runnable {
     final public Input<TreeFile> treeInput = new Input<>("trees", "trees file to construct CCD with and analyse", Input.Validate.REQUIRED);
@@ -67,6 +71,8 @@ public class CCDSampler extends Runnable {
                 bufferedOutputWriter.newLine();
             }
         }
+
+        CCDToolUtil.printCitations(this);
     }
 
     public static void main(String[] args) throws Exception {

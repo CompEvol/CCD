@@ -5,8 +5,8 @@ import ccd.model.bitsets.BitSet;
 
 import java.util.Map;
 
-final class CPSupport {
-    private CPSupport() {
+final class ELSupport {
+    private ELSupport() {
     }
 
     static int extendedBitWidth(int leafArraySize) {
@@ -134,7 +134,7 @@ final class CPSupport {
         return bits;
     }
 
-    static Clade computeProbCPVertex(Node vertex, double[] runningProbability, boolean computeLog, AbstractCCD ccd, int leafArraySize) {
+    static Clade computeProbELVertex(Node vertex, double[] runningProbability, boolean computeLog, AbstractCCD ccd, int leafArraySize) {
         if (vertex.isLeaf()) {
             // set bitSet
             BitSet leafKey = leafKey(vertex, leafArraySize);
@@ -149,8 +149,8 @@ final class CPSupport {
             return leafClade;
         }
 
-        Clade firstChildClade = computeProbCPVertex(vertex.getChildren().get(0), runningProbability, computeLog, ccd, leafArraySize);
-        Clade secondChildClade = computeProbCPVertex(vertex.getChildren().get(1), runningProbability, computeLog, ccd, leafArraySize);
+        Clade firstChildClade = computeProbELVertex(vertex.getChildren().get(0), runningProbability, computeLog, ccd, leafArraySize);
+        Clade secondChildClade = computeProbELVertex(vertex.getChildren().get(1), runningProbability, computeLog, ccd, leafArraySize);
 
         if (computeLog && runningProbability[0] > 0) {
             return null;
@@ -183,11 +183,11 @@ final class CPSupport {
     /* -- HELD-OUT (LEAVE-ONE-TREE-OUT) TREE PROBABILITY -- */
 
     static Clade computeTreeProbabilityHeldOut(AbstractCCD ccd, Node root, double[] runningProbability, double alpha, boolean computeLog) {
-        Clade variant = computeProbCPVertexHeldOut(ccd, root, runningProbability, alpha, computeLog);
+        Clade variant = computeProbELVertexHeldOut(ccd, root, runningProbability, alpha, computeLog);
         return variant;
     }
 
-    private static Clade computeProbCPVertexHeldOut(AbstractCCD ccd, Node vertex, double[] runningProbability, double alpha, boolean computeLog) {
+    private static Clade computeProbELVertexHeldOut(AbstractCCD ccd, Node vertex, double[] runningProbability, double alpha, boolean computeLog) {
         if (vertex.isLeaf()) {
             BitSet leafKey = leafKey(vertex, ccd.leafArraySize);
             Clade leafClade = ccd.cladeMapping.get(leafKey);
@@ -198,8 +198,8 @@ final class CPSupport {
             return leafClade;
         }
 
-        Clade firstChildClade = computeProbCPVertexHeldOut(ccd, vertex.getChildren().get(0), runningProbability, alpha, computeLog);
-        Clade secondChildClade = computeProbCPVertexHeldOut(ccd, vertex.getChildren().get(1), runningProbability, alpha, computeLog);
+        Clade firstChildClade = computeProbELVertexHeldOut(ccd, vertex.getChildren().get(0), runningProbability, alpha, computeLog);
+        Clade secondChildClade = computeProbELVertexHeldOut(ccd, vertex.getChildren().get(1), runningProbability, alpha, computeLog);
 
         if (firstChildClade == null || secondChildClade == null) {
             AbstractCCD.setComputedNoProbability(runningProbability, computeLog);
