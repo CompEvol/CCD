@@ -755,6 +755,13 @@ public abstract class AbstractCCD implements ITreeDistribution {
         return -testro;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The default implementation returns the number of topologies represented by the CCD
+     * graph, which is the support for any model that assigns probability only within its graph.
+     * Full-support subclasses must override this; see {@link ITreeDistribution#getNumberOfTrees()}.
+     */
     @Override
     public BigInteger getNumberOfTrees() {
         if (numberOfTopologiesDirty) {
@@ -762,6 +769,48 @@ public abstract class AbstractCCD implements ITreeDistribution {
         }
 
         return this.rootClade.getNumberOfTopologies();
+    }
+
+    /**
+     * The number of rooted binary topologies on {@code n} labelled taxa, {@code (2n-3)!!}.
+     * Returns {@code 1} for {@code n <= 2}. This is the support size of any full-support model
+     * on {@code n} taxa.
+     *
+     * @param n number of taxa
+     * @return {@code (2n-3)!!} as a {@link BigInteger}
+     */
+    public static BigInteger numberOfRootedTopologies(int n) {
+        BigInteger result = BigInteger.ONE;
+        for (int k = 2 * n - 3; k > 1; k -= 2) {
+            result = result.multiply(BigInteger.valueOf(k));
+        }
+        return result;
+    }
+
+    /**
+     * Natural logarithm of a positive {@link BigInteger}, correct for values far outside
+     * {@code double} range.
+     *
+     * <p>{@code Math.log(value.doubleValue())} is not usable here: a {@code double} overflows to
+     * infinity above about 1.8e308, i.e. beyond roughly 1024 bits, and tree counts in this
+     * package routinely exceed that. Instead the value is shifted right so that at most 1000
+     * bits remain, comfortably inside {@code double} range, and the shift is added back as
+     * {@code shift * log 2}. Precision is unaffected, since {@code double} carries only 53
+     * mantissa bits either way.
+     *
+     * @param value a strictly positive value
+     * @return the natural logarithm of {@code value}
+     * @throws IllegalArgumentException if {@code value} is not positive
+     */
+    public static double logBigInteger(BigInteger value) {
+        if (value.signum() <= 0) {
+            throw new IllegalArgumentException("log of non-positive BigInteger: " + value);
+        }
+        int shift = value.bitLength() - 1000;
+        if (shift > 0) {
+            return Math.log(value.shiftRight(shift).doubleValue()) + shift * Math.log(2.0);
+        }
+        return Math.log(value.doubleValue());
     }
 
     /**

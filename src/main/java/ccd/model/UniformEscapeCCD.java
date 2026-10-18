@@ -241,25 +241,7 @@ public class UniformEscapeCCD extends CCD1 {
      * @return {@code (2n-3)!!} as a {@link BigInteger}
      */
     public static BigInteger numberOfRootedTopologies(int n) {
-        BigInteger result = BigInteger.ONE;
-        for (int k = 2 * n - 3; k > 1; k -= 2) {
-            result = result.multiply(BigInteger.valueOf(k));
-        }
-        return result;
+        return AbstractCCD.numberOfRootedTopologies(n);
     }
 
-    /**
-     * Natural logarithm of a {@link BigInteger}, robust to values far beyond {@code double} range
-     * (shifts the value into the mantissa range and corrects with the shift).
-     */
-    static double logBigInteger(BigInteger value) {
-        if (value.signum() <= 0) {
-            throw new IllegalArgumentException("log of non-positive BigInteger: " + value);
-        }
-        int shift = value.bitLength() - 1000; // keep the top ~1000 bits, well within double range
-        if (shift > 0) {
-            return Math.log(value.shiftRight(shift).doubleValue()) + shift * Math.log(2.0);
-        }
-        return Math.log(value.doubleValue());
-    }
 }

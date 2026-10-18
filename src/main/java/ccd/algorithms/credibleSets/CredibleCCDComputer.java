@@ -370,18 +370,9 @@ public abstract class CredibleCCDComputer implements ICredibleSet {
         }
     }
 
-    public static double logBigInteger(BigInteger val) {
-        int precision = Math.max((int) (Math.log(val.bitLength()) / Math.log(2)), 20); // Ensure sufficient precision
-        BigDecimal bigDecimalVal = new BigDecimal(val);
-        int scale = bigDecimalVal.scale();
-
-        // Scale value for improved precision
-        BigDecimal scaledValue = bigDecimalVal.movePointLeft(scale);
-
-        // Compute the logarithm using BigDecimal
-        double log2 = Math.log(scaledValue.doubleValue());
-
-        // Adjust the logarithm based on the scale
-        return log2 + scale * Math.log(10);
-    }
+    // NOTE: a logBigInteger implementation lived here and was removed. It was incorrect:
+    // new BigDecimal(aBigInteger).scale() is always 0, so movePointLeft(scale) was a no-op and
+    // the method reduced to Math.log(val.doubleValue()), which is infinite above ~1.8e308 --
+    // i.e. for essentially every tree count this class deals with.
+    // Use AbstractCCD.logBigInteger(BigInteger) instead.
     */
