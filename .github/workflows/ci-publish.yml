@@ -31,7 +31,6 @@ jobs:
           java-version: '25'
           cache: maven
           server-id: central
-          maven-version: '3.9.9' # Maven 3.10.x caches or overlays repository metadata files incorrectly in Sonatype.
           server-username: CENTRAL_USERNAME
           server-password: CENTRAL_TOKEN
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
