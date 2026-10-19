@@ -9,3 +9,6 @@ out/
 .DS_Store
 /bin/
 .project
+
+# JVM crash logs from long benchmark runs
+hs_err_pid*.log

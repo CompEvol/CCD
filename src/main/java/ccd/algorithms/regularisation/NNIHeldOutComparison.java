@@ -97,9 +97,10 @@ public class NNIHeldOutComparison {
             specs.add(new ModelSpec(String.format("NNIRegCCD[CO_OCCURRING,b=%.3f]", beta),
                     tr -> new NNIRegCCD(tr, 0.0, PairingMode.CO_OCCURRING, alpha, beta)));
         }
-        // full-support KRegCCD (reserve depth 2); compare the three tail modes to
-        // show the normalisation effect on mean logP: NONE (super-normalised),
-        // BOUND (upper bound, sub-normalised), SAMPLED (Knuth, near-exact)
+        // full-support KRegCCD (reserve depth 2); compare the three tail modes to show the
+        // normalisation effect on mean logP. All three are sub-normalised by Theta(mu^2) (see
+        // KRegCCD.TailMode); they differ only in the O(mu^3) truncation term: NONE omits it,
+        // BOUND over-corrects it, SAMPLED estimates it (landing within noise of NONE).
         for (double mu : new double[]{0.01, 0.05, 0.1, 0.2}) {
             specs.add(new ModelSpec(String.format("KRegCCD[rd=2,none,mu=%.2f]", mu),
                     tr -> new KRegCCD(tr, 0.0, mu, alpha, 2, KRegCCD.TailMode.NONE)));
