@@ -142,6 +142,9 @@ public class PriorCoalescentCCPComputer {
         // use flattened table for speedup
         // thus T[i][j] = T[i * cols + j]
         final BigDecimal[] T = new BigDecimal[rows * cols];
+        // start with all entries zero, so that cells not yet reached (e.g. when several
+        // taxa are sampled at the same time) are not read as null
+        Arrays.fill(T, BigDecimal.ZERO);
         // furthermore, the DP loops over several tables in theory,
         // but we can use a single table and overwrite previous values
         // since any entry T[i,j] at time i only depends

@@ -146,6 +146,11 @@ public class BitSet64 extends BitSet {
      * @since 1.4
      */
     public int nextSetBit(int fromIndex) {
+        // past the last bit: no further bits. Without this, the shift below wraps
+        // (a long shifted by 64 is shifted by 0) and the scan restarts at bit 0.
+        if (fromIndex >= 64) {
+            return -1;
+        }
         long word = word1 & (WORD_MASK << fromIndex);
         int u = fromIndex >> ADDRESS_BITS_PER_WORD;
         if (word != 0)
@@ -163,6 +168,11 @@ public class BitSet64 extends BitSet {
      * @since 1.4
      */
     public int nextClearBit(int fromIndex) {
+        // past the last bit: no further bits. Without this, the shift below wraps
+        // (a long shifted by 64 is shifted by 0) and the scan restarts at bit 0.
+        if (fromIndex >= 64) {
+            return -1;
+        }
         long word = ~word1 & (WORD_MASK << fromIndex);
         int u = fromIndex >> ADDRESS_BITS_PER_WORD;
         if (word != 0)
