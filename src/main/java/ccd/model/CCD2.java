@@ -437,33 +437,48 @@ public class CCD2 extends AbstractCCD {
 
     @Override
     public double getProbabilityOfTree(Tree tree) {
-        resetCacheIfProbabilitiesDirty();
-
-        double[] runningProbability = new double[]{1};
-        Node root = tree.getRoot();
-        ExtendedClade[] children = computeProbabilityOfVertices(root.getChild(0), root.getChild(1), runningProbability);
-        if (runningProbability[0] == 0) {
-            return 0;
-        } else {
-            CladePartition partition = rootClade.getCladePartition(children[0], children[1]);
-            if (partition != null) {
-                return runningProbability[0] * partition.getCCP();
-            } else {
-                return 0;
-            }
-        }
+        return computeProbabilityOfTree(tree, false);
     }
 
-    /* Recursive helper method */
-    private ExtendedClade[] computeProbabilityOfVertices(Node leftVertex, Node rightVertex, double[] runningProbability) {
+    /**
+     * Return the log probability of the given tree in this distribution. CCD2 needs its own
+     * version, as its partitions are between extended clades (#24).
+     */
+    @Override
+    public double getLogProbabilityOfTree(Tree tree) {
+        return computeProbabilityOfTree(tree, true);
+    }
+
+    /* Helper method: the probability, or log probability, of the given tree */
+    private double computeProbabilityOfTree(Tree tree, boolean computeLog) {
+        resetCacheIfProbabilitiesDirty();
+
+        double[] runningProbability = new double[]{computeLog ? 0 : 1};
+        Node root = tree.getRoot();
+        ExtendedClade[] children = computeProbabilityOfVertices(root.getChild(0), root.getChild(1),
+                runningProbability, computeLog);
+        if (children == null) {
+            return computeLog ? Double.NEGATIVE_INFINITY : 0;
+        }
+        CladePartition partition = rootClade.getCladePartition(children[0], children[1]);
+        if (partition == null) {
+            return computeLog ? Double.NEGATIVE_INFINITY : 0;
+        }
+        return computeLog ? runningProbability[0] + partition.getLogCCP()
+                : runningProbability[0] * partition.getCCP();
+    }
+
+    /* Recursive helper method; returns null if the tree has probability zero */
+    private ExtendedClade[] computeProbabilityOfVertices(Node leftVertex, Node rightVertex,
+                                                         double[] runningProbability, boolean computeLog) {
         BitSet leftInBits = BitSet.newBitSet(leafArraySize);
         BitSet rightInBits = BitSet.newBitSet(leafArraySize);
 
-        ExtendedClade[] leftChildren = computeProbabilityOfChildren(leftVertex, leftInBits, runningProbability);
+        ExtendedClade[] leftChildren = computeProbabilityOfChildren(leftVertex, leftInBits, runningProbability, computeLog);
         if (!leftVertex.isLeaf() && (leftChildren == null)) {
             return null;
         }
-        ExtendedClade[] rightChildren = computeProbabilityOfChildren(rightVertex, rightInBits, runningProbability);
+        ExtendedClade[] rightChildren = computeProbabilityOfChildren(rightVertex, rightInBits, runningProbability, computeLog);
         if (!rightVertex.isLeaf() && (rightChildren == null)) {
             return null;
         }
@@ -471,41 +486,48 @@ public class CCD2 extends AbstractCCD {
         ExtendedClade leftClade = getExtendedClade(leftInBits, rightInBits);
         ExtendedClade rightClade = getExtendedClade(rightInBits, leftInBits);
         if ((leftClade == null) || (rightClade == null)) {
-            runningProbability[0] = 0;
+            setComputedNoProbability(runningProbability, computeLog);
             return null;
         }
 
-        if (!leftVertex.isLeaf()) {
-            CladePartition partition = leftClade.getCladePartition(leftChildren[0], leftChildren[1]);
-            if (partition != null) {
-                runningProbability[0] *= partition.getCCP();
-            } else {
-                runningProbability[0] = 0;
-                return null;
-            }
+        if (!leftVertex.isLeaf()
+                && !multiplyByCCP(leftClade, leftChildren, runningProbability, computeLog)) {
+            return null;
         }
-        if (!rightVertex.isLeaf()) {
-            CladePartition partition = rightClade.getCladePartition(rightChildren[0], rightChildren[1]);
-            if (partition != null) {
-                runningProbability[0] *= partition.getCCP();
-            } else {
-                runningProbability[0] = 0;
-                return null;
-            }
+        if (!rightVertex.isLeaf()
+                && !multiplyByCCP(rightClade, rightChildren, runningProbability, computeLog)) {
+            return null;
         }
 
         return new ExtendedClade[]{leftClade, rightClade};
     }
 
+    /* Helper method; returns false if the clade has no such partition */
+    private static boolean multiplyByCCP(ExtendedClade clade, ExtendedClade[] children,
+                                         double[] runningProbability, boolean computeLog) {
+        CladePartition partition = clade.getCladePartition(children[0], children[1]);
+        if (partition == null) {
+            setComputedNoProbability(runningProbability, computeLog);
+            return false;
+        }
+        if (computeLog) {
+            runningProbability[0] += partition.getLogCCP();
+        } else {
+            runningProbability[0] *= partition.getCCP();
+        }
+        return true;
+    }
+
     /* Helper method */
-    private ExtendedClade[] computeProbabilityOfChildren(Node vertex, BitSet cladeInBits, double[] runningProbability) {
+    private ExtendedClade[] computeProbabilityOfChildren(Node vertex, BitSet cladeInBits,
+                                                        double[] runningProbability, boolean computeLog) {
         ExtendedClade[] leftChildren = null;
         if (vertex.isLeaf()) {
             int index = vertex.getNr();
             cladeInBits.set(index);
         } else {
             leftChildren = computeProbabilityOfVertices(vertex.getChildren().get(0),
-                    vertex.getChildren().get(1), runningProbability);
+                    vertex.getChildren().get(1), runningProbability, computeLog);
 
             if (leftChildren == null) {
                 return null;
