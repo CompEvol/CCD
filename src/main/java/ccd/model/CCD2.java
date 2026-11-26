@@ -159,13 +159,10 @@ public class CCD2 extends AbstractCCD {
 
     @Override
     protected void cladifyTree(Tree tree) {
-        if (super.storesBaseTrees()) {
-            this.baseTrees.add(tree);
-        } else if (this.baseTrees.isEmpty()) {
-            this.baseTrees.add(tree);
-        }
+        Tree prepared = prepareTree(tree);
+        storeBaseTree(tree, prepared);
 
-        Node root = tree.getRoot();
+        Node root = prepared.getRoot();
         ExtendedClade[] children = cladifyVertices(root.getChild(0), root.getChild(1));
 
         CladePartition rootPartition = this.rootClade.getCladePartition(children[0], children[1]);
@@ -290,11 +287,7 @@ public class CCD2 extends AbstractCCD {
     @Override
     public void removeTree(Tree tree, boolean tidyUpCCDGraph) {
         // throw new UnsupportedOperationException("Removing trees not supported for CCD2s yet.");
-        if (super.storesBaseTrees() && !this.baseTrees.remove(tree)) {
-            System.err.println("WARNING: Removing tree from CCD that was not part of it.");
-        }
-
-        Node root = tree.getRoot();
+        Node root = removeBaseTree(tree).getRoot();
         ExtendedClade[] children = reduceCladeCount(root.getLeft(), root.getRight());
 
         if (tidyUpCCDGraph) {
@@ -440,7 +433,7 @@ public class CCD2 extends AbstractCCD {
         resetCacheIfProbabilitiesDirty();
 
         double[] runningProbability = new double[]{1};
-        Node root = tree.getRoot();
+        Node root = prepareTree(tree).getRoot();
         ExtendedClade[] children = computeProbabilityOfVertices(root.getChild(0), root.getChild(1), runningProbability);
         if (runningProbability[0] == 0) {
             return 0;

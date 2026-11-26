@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,21 @@ public abstract class AbstractCCD implements ITreeDistribution {
      * Whether to store the trees used to create this CCD.
      */
     private final boolean storeBaseTrees;
+
+    /**
+     * Whether to collapse unnamed internal nodes with a single child, such as the root above
+     * the trunk of SIEVE trees, before processing a tree (CompEvol/CCD#22). Defaults to the
+     * system property {@code ccd.collapseSingleChildNodes}, or true. Named single-child nodes
+     * are always refused, as they may be sampled ancestors.
+     */
+    private boolean collapseSingleChildNodes =
+            Boolean.parseBoolean(System.getProperty("ccd.collapseSingleChildNodes", "true"));
+
+    /** Whether the warning about collapsed single-child nodes has been given. */
+    private boolean warnedAboutSingleChildNodes = false;
+
+    /** Collapsed copies kept in {@link #baseTrees}, by the tree they were made from, for {@link #removeTree}. */
+    private final Map<Tree, Tree> collapsedBaseTrees = new IdentityHashMap<>();
 
     /**
      * The number of trees this CCD is based on.
@@ -249,19 +265,91 @@ public abstract class AbstractCCD implements ITreeDistribution {
      * @param tree to be added and processed into the CCD graph
      */
     public void addTree(Tree tree) {
+        this.cladifyTree(tree); // first, so a refused tree is not counted
         this.numBaseTrees++;
-        this.cladifyTree(tree);
         this.setCacheAsDirty();
     }
 
     /* Helper method; process one tree into this CCD */
     protected void cladifyTree(Tree tree) {
-        if (storeBaseTrees) {
-            this.baseTrees.add(tree);
-        } else if (this.baseTrees.isEmpty()) {
-            this.baseTrees.add(tree);
+        Tree prepared = prepareTree(tree);
+        storeBaseTree(tree, prepared);
+        cladifyVertex(prepared.getRoot());
+    }
+
+    /**
+     * Stores a tree (as prepared by {@link #prepareTree}) among the base trees, if base
+     * trees are stored, or if it is the first.
+     */
+    protected void storeBaseTree(Tree tree, Tree prepared) {
+        if (storeBaseTrees || this.baseTrees.isEmpty()) {
+            this.baseTrees.add(prepared);
+            if (storeBaseTrees && prepared != tree) {
+                collapsedBaseTrees.put(tree, prepared);
+            }
         }
-        cladifyVertex(tree.getRoot());
+    }
+
+    /**
+     * Takes a stored base tree out of the base trees, given the tree that was added.
+     *
+     * @return the tree as it was prepared and stored, to remove its clades
+     */
+    protected Tree removeBaseTree(Tree tree) {
+        Tree prepared = collapsedBaseTrees.remove(tree);
+        if (prepared == null) {
+            prepared = prepareTree(tree);
+        }
+        if (storeBaseTrees && !this.baseTrees.remove(prepared)) {
+            System.err.println("WARNING: Removing tree from CCD that was not part of it.");
+        }
+        return prepared;
+    }
+
+    /**
+     * Sets whether unnamed internal nodes with a single child are collapsed before a tree is
+     * processed (the default); otherwise such trees are refused.
+     */
+    public void setCollapseSingleChildNodes(boolean collapse) {
+        this.collapseSingleChildNodes = collapse;
+    }
+
+    /** @return whether unnamed internal nodes with a single child are collapsed */
+    public boolean collapsesSingleChildNodes() {
+        return collapseSingleChildNodes;
+    }
+
+    /**
+     * Returns the tree to process: the tree itself if every internal node has two children,
+     * or a copy with its unnamed single-child nodes collapsed (CompEvol/CCD#22).
+     *
+     * @throws IllegalArgumentException if a single-child node is named, or collapsing is off
+     */
+    protected Tree prepareTree(Tree tree) {
+        return prepareTree(tree, null);
+    }
+
+    /**
+     * As {@link #prepareTree(Tree)}; if the tree is copied and copyToOriginal is not null,
+     * it receives the original node of every node in the copy.
+     */
+    protected Tree prepareTree(Tree tree, Map<Node, Node> copyToOriginal) {
+        int count = SingleChildNodes.countUnnamed(tree);
+        if (count == 0) {
+            return tree;
+        }
+        if (!collapseSingleChildNodes) {
+            throw new IllegalArgumentException("The tree has " + count + " internal node(s) with a single child, "
+                    + "but CCD needs every internal node to have two children. "
+                    + "Remove them, or let CCD collapse them (ccd.collapseSingleChildNodes=true).");
+        }
+        if (!warnedAboutSingleChildNodes) {
+            warnedAboutSingleChildNodes = true;
+            System.err.println("WARNING: CCD collapses unnamed internal nodes with a single child, "
+                    + "for example a root above a trunk (" + count + " in the first such tree); "
+                    + "the summary tree has none.");
+        }
+        return SingleChildNodes.collapse(tree, copyToOriginal);
     }
 
     /* Recursive helper method */
@@ -342,11 +430,9 @@ public abstract class AbstractCCD implements ITreeDistribution {
      *                       clades
      */
     public void removeTree(Tree tree, boolean tidyUpCCDGraph) {
-        if (this.storeBaseTrees && !this.baseTrees.remove(tree)) {
-            System.err.println("WARNING: Removing tree from CCD that was not part of it.");
-        }
+        Tree prepared = removeBaseTree(tree);
 
-        this.reduceCladeCount(tree.getRoot());
+        this.reduceCladeCount(prepared.getRoot());
         this.numBaseTrees--;
 
         if (tidyUpCCDGraph) {
@@ -1258,7 +1344,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
                 baseTreeSet.reset();
                 while (baseTreeSet.hasNext()) {
                     Tree tree = baseTreeSet.next();
-                    extractCommonAncestorHeightsFromTree(tree);
+                    extractCommonAncestorHeightsFromTree(prepareTree(tree));
                 }
 
             } catch (IOException e) {
@@ -1399,8 +1485,14 @@ public abstract class AbstractCCD implements ITreeDistribution {
      * @return a map from each clade with a respective vertex in the given tree to that vertex
      */
     public Map<Clade, Node> getCladeToNodeMap(Tree tree) {
+        Map<Node, Node> copyToOriginal = new HashMap<>();
+        Tree prepared = prepareTree(tree, copyToOriginal);
         Map<Clade, Node> map = new HashMap<>(tree.getNodeCount());
-        computeCladeToNodeMapping(tree.getRoot(), map);
+        computeCladeToNodeMapping(prepared.getRoot(), map);
+        if (prepared != tree) {
+            // map to the nodes of the given tree, not of its collapsed copy
+            map.replaceAll((clade, node) -> copyToOriginal.get(node));
+        }
         return map;
     }
 
@@ -1439,7 +1531,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         resetCacheIfProbabilitiesDirty();
 
         double[] runningProbability = new double[]{1};
-        computeProbabilityOfVertex(tree.getRoot(), runningProbability, false);
+        computeProbabilityOfVertex(prepareTree(tree).getRoot(), runningProbability, false);
 
         return runningProbability[0];
     }
@@ -1454,7 +1546,7 @@ public abstract class AbstractCCD implements ITreeDistribution {
         resetCacheIfProbabilitiesDirty();
 
         double[] runningProbability = new double[]{0};
-        computeProbabilityOfVertex(tree.getRoot(), runningProbability, true);
+        computeProbabilityOfVertex(prepareTree(tree).getRoot(), runningProbability, true);
 
         return runningProbability[0];
     }
